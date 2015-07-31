@@ -60,9 +60,18 @@ function loadPackage(package) {
           }
         },
         addFiles: function(filename, architecture) {
-          console.log('  evaling ', filename);
-          var filename = '../.meteor/meteor/packages/' + package + '/' + filename;
-          eval(fs.readFileSync(filename).toString());
+          if (architecture && architecture.constructor == String) {
+            architecture = [architecture];
+          }
+          var serverFile = !architecture ||
+                             architecture.length === 0 ||
+                             architecture.indexOf('server') !== -1;
+
+          if (serverFile) {
+            console.log('  evaling ', filename);
+            var filename = '../.meteor/meteor/packages/' + package + '/' + filename;
+            eval(fs.readFileSync(filename).toString());
+          }
         }
       };
       (function() {
