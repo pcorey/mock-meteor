@@ -4,6 +4,8 @@ var chai = require("chai");
     fs = require("fs"),
     _ = require("underscore");
 
+var Fiber = require("fibers");
+
 function loadPackage(package) {
   Npm = {
     depends: function() {},
@@ -56,7 +58,7 @@ function loadPackage(package) {
             exportedObject.map(function(objectName) {
               // Export from closure scope to global scope
               global[objectName] = this[objectName];
-            })
+            });
           }
         },
         addFiles: function(filename, architecture) {
@@ -86,4 +88,17 @@ function loadPackage(package) {
   eval.bind(global)(fs.readFileSync(packageJS).toString());
 }
 
-loadPackage('meteor-platform');
+__meteor_bootstrap__ = {
+  startupHooks: [],
+  serverDir: './',
+  configJson: {} };
+__meteor_runtime_config__ = { meteorRelease: "METEOR@1.1.0.2" };
+// var cwd = process.cwd();
+// process.chdir('../.meteor/meteor/tools/server/');
+// var boot = './boot.js';
+// eval(fs.readFileSync(boot).toString());
+// process.chdir(cwd);
+
+Fiber(function () {
+  loadPackage('meteor-platform');
+}).run();
