@@ -62,6 +62,9 @@ function loadPackage(package) {
           }
         },
         addFiles: function(filename, architecture) {
+          if (package == 'webapp') {
+            return;
+          }
           if (architecture && architecture.constructor == String) {
             architecture = [architecture];
           }
@@ -73,6 +76,7 @@ function loadPackage(package) {
             console.log('  evaling ', filename);
             var filename = '../.meteor/meteor/packages/' + package + '/' + filename;
             eval(fs.readFileSync(filename).toString());
+            console.log('done');
           }
         }
       };
@@ -92,7 +96,7 @@ __meteor_bootstrap__ = {
   startupHooks: [],
   serverDir: './',
   configJson: {} };
-__meteor_runtime_config__ = { meteorRelease: "METEOR@1.1.0.2" };
+__meteor_runtime_config__ = { meteorRelease: "METEOR@MOCK" };
 // var cwd = process.cwd();
 // process.chdir('../.meteor/meteor/tools/server/');
 // var boot = './boot.js';
