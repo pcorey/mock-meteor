@@ -6,7 +6,21 @@ var chai = require("chai");
 
 var Fiber = require("fibers");
 
-function loadPackage(package) {
+function loadPackage(package, context, excludedPackages, visitedPackages, depth) {
+  depth = depth || 0;
+  function log(str) {
+    console.log(Array(depth).join(' ')+str);
+  }
+
+  if (!visitedPackages) {
+    visitedPackages = [];
+  }
+  if (_.contains(visitedPackages, package) ||
+      _.contains(excludedPackages, package)) {
+    return;
+  }
+  visitedPackages.push(package);
+
   Npm = {
     depends: function() {},
     strip: function() {},
@@ -15,7 +29,7 @@ function loadPackage(package) {
 
   Cordova = {
     depends: function() {}
-  }
+  };
 
   Package = {
     describe: function() {},
@@ -23,17 +37,15 @@ function loadPackage(package) {
     onUse: function(callback) {
       var API = {
         imply: function(packageSpecs) {
-          if (typeof packageSpecs === 'string') {
-            packageSpecs = [packageSpecs];
-          }
-          packageSpecs.map(loadPackage);
+          this._implies = this._implies.concat(packageSpecs);
         },
         use: function(packageNames, architecture, options) {
-          if (typeof packageNames === 'string') {
-            packageNames = [packageNames];
+          var serverUse = true;
+          if (_.isArray(architecture)) {
+            serverUser = architecture.indexOf('server') !== -1;
           }
-          if (typeof architecture === 'string') {
-            architecture = [architecture];
+          if (serverUse) {
+            this._uses = this._uses.concat(packageNames);
           }
         },
         export: function(exportedObject, architecture) {
@@ -55,16 +67,14 @@ function loadPackage(package) {
           }
 
           if (serverExport) {
-            exportedObject.map(function(objectName) {
-              // Export from closure scope to global scope
-              global[objectName] = this[objectName];
-            });
+            // exportedObject.map(function(objectName) {
+            //   // Export from closure scope to global scope
+            //   global[objectName] = this[objectName];
+            // });
+            this._exports = this._exports.concat(exportedObject);
           }
         },
         addFiles: function(filename, architecture) {
-          if (package == 'webapp') {
-            return;
-          }
           if (architecture && architecture.constructor == String) {
             architecture = [architecture];
           }
@@ -73,21 +83,49 @@ function loadPackage(package) {
                              architecture.indexOf('server') !== -1;
 
           if (serverFile) {
-            console.log('  evaling ', filename);
+            this._files = this._files.concat(filename);
+          }
+        },
+        _implies: [],
+        _uses: [],
+        _exports: [],
+        _files: [],
+        _finish: function() {
+          // Load implies to global scope
+          this._implies.map(function(package) {
+            loadPackage(package, global, excludedPackages, visitedPackages, depth+1);
+          });
+
+          // Load implies to global scope
+          this._uses.map(function(package) {
+            loadPackage(package, global, excludedPackages, visitedPackages, depth+1);
+          });
+
+          // Eval files
+          this._files.map(function(filename) {
+            if (_.last(filename.split('.')) !== 'js') {
+              return;
+            }
+            log('evaling ' + filename);
             var filename = '../.meteor/meteor/packages/' + package + '/' + filename;
             eval(fs.readFileSync(filename).toString());
-            console.log('done');
-          }
+          });
+
+          // Export references to global scope
+          this._exports.map(function(objectName) {
+            context[objectName] = this[objectName];
+          });
         }
       };
       (function() {
         callback(API);
+        API._finish();
       })();
     },
     onTest: function() {}
   };
 
-  console.log('Loading ', package);
+  log('Loading ' + package);
   var packageJS = '../.meteor/meteor/packages/' + package + '/package.js';
   eval.bind(global)(fs.readFileSync(packageJS).toString());
 }
@@ -97,6 +135,7 @@ __meteor_bootstrap__ = {
   serverDir: './',
   configJson: {} };
 __meteor_runtime_config__ = { meteorRelease: "METEOR@MOCK" };
+
 // var cwd = process.cwd();
 // process.chdir('../.meteor/meteor/tools/server/');
 // var boot = './boot.js';
@@ -104,5 +143,8 @@ __meteor_runtime_config__ = { meteorRelease: "METEOR@MOCK" };
 // process.chdir(cwd);
 
 Fiber(function () {
-  loadPackage('meteor-platform');
+  loadPackage('meteor-platform', global, [
+    'es5-shim',
+    'isobuild:compiler-plugin@1.0.0'
+  ]);
 }).run();
