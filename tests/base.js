@@ -1,15 +1,14 @@
 var chai = require("chai");
     expect = chai.expect,
     core = require("./base.js"),
-    fs = require("fs"),
-    _ = require("underscore");
+    fs = require("fs");
 
 var Fiber = require("fibers");
 
 function loadPackage(package, context, excludedPackages, visitedPackages, depth) {
   depth = depth || 0;
   function log(str) {
-    console.log(Array(depth).join(' ')+str);
+    //console.log(Array(depth).join(' ')+str);
   }
 
   if (!visitedPackages) {
@@ -115,6 +114,14 @@ function loadPackage(package, context, excludedPackages, visitedPackages, depth)
           this._exports.map(function(objectName) {
             context[objectName] = this[objectName];
           });
+
+          if (package === 'webapp') {
+            oldMain = main;
+            main = function() {
+              console.log('main', arguments);
+              return oldMain.apply(this, arguments);
+            }
+          }
         }
       };
       (function() {
@@ -148,3 +155,5 @@ Fiber(function () {
     'isobuild:compiler-plugin@1.0.0'
   ]);
 }).run();
+
+console.log('done');
