@@ -1,6 +1,6 @@
 Package.describe({
   summary: "Utility functions for tests",
-  version: '1.0.5-plugins.0'
+  version: '1.0.4'
 });
 
 Package.onUse(function (api) {
@@ -20,7 +20,7 @@ Package.onUse(function (api) {
     'pollUntil', 'try_all_permutations',
     'SeededRandom', 'clickElement', 'blurElement',
     'focusElement', 'simulateEvent', 'getStyleProperty', 'canonicalizeHtml',
-    'renderToDiv', 'clickIt',
+    'renderToDiv',
     'withCallbackLogger', 'testAsyncMulti', 'simplePoll',
     'makeTestConnection', 'DomUtils']);
 

@@ -31,4 +31,11 @@ function visible() {
   return 1337;
 }
 
-module.exports.visible = visible;
+/*
+
+> process.argv
+[ '/Users/pcorey/.meteor/packages/meteor-tool/.1.1.3.1wysac9++os.osx.x86_64+web.browser+web.cordova/mt-os.osx.x86_64/dev_bundle/bin/node',
+  '/Users/pcorey/mock-meteor/.meteor/local/build/main.js',
+  'program.json' ]
+
+*/

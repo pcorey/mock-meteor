@@ -8,9 +8,9 @@ var release = require('./release.js');
 var files = require('./files.js');
 var utils = require('./utils.js');
 var buildmessage = require('./buildmessage.js');
-var compiler = require('./isobuild/compiler.js');
+var compiler = require('./compiler.js');
 var authClient = require('./auth-client.js');
-var catalog = require('./catalog/catalog.js');
+var catalog = require('./catalog.js');
 var projectContextModule = require('./project-context.js');
 var colonConverter = require("./colon-converter.js");
 
@@ -48,20 +48,22 @@ var saveReadmeToTmp = function (readmeInfo) {
 // Given a connection, makes a call to the package server.  (Checks to see if
 // the connection is connected, and reconnects if needed -- a workaround for
 // the fact that connections in the tool do not reconnect)
-exports.callPackageServer = function (conn, ...args) {
+exports.callPackageServer = function (conn) {
   // XXX This is broken since it doesn't actually replace the conn in the
   // caller, so it'll happen on every subsequent call
   if (!conn.connected) {
     conn.close();
     conn = exports.loggedInPackagesConnection();
   }
-  return conn.call(...args);
+  var args = _.values(arguments)
+        .slice(1, arguments.length);
+  return conn.call.apply(conn, args);
 };
 
-var callPackageServerBM = exports.callPackageServerBM = function (...args) {
+var callPackageServerBM = exports.callPackageServerBM = function () {
   buildmessage.assertInJob();
   try {
-    return exports.callPackageServer.apply(null, args);
+    return exports.callPackageServer.apply(null, arguments);
   } catch (e) {
     buildmessage.error(e.reason || e.message);
     return null;
@@ -326,8 +328,7 @@ var uploadFile = function (putUrl, filepath) {
       bodyStreamLength: size
     });
   } catch (err) {
-    // XXX: getUrl's error handling is terrible and we should fix it there.
-    buildmessage.error(typeof err === "string" ? err : err.error.toString());
+    buildmessage.error(err.error.toString());
     return false;
   } finally {
     rs.close();
@@ -348,11 +349,7 @@ var bundleBuild = function (isopack) {
   // disk in an IsopackCache, because we don't want to include
   // isopack-buildinfo.json. (We don't include it because we're not passing
   // includeIsopackBuildInfo to saveToPath here.)
-  isopack.saveToPath(tarInputDir, {
-    // When publishing packages that don't use new registerCompiler plugins,
-    // make sure that old Meteors can use it too
-    includePreCompilerPluginIsopackVersions: true
-  });
+  isopack.saveToPath(tarInputDir);
 
   var buildTarball = files.pathJoin(tempDir, packageTarName + '.tgz');
 
@@ -630,9 +627,8 @@ exports.publishPackage = function (options) {
   }
   var readmePath = saveReadmeToTmp(readmeInfo);
 
-  var packageDeps = packageSource.getDependencyMetadata();
-
   // Check that the package does not have any unconstrained references.
+  var packageDeps = packageSource.getDependencyMetadata();
   _.each(packageDeps, function(refs, label) {
     if (refs.constraint == null) {
       if (packageSource.isCore && files.inCheckout() &&
@@ -668,20 +664,6 @@ exports.publishPackage = function (options) {
   var isopack = projectContext.isopackCache.getIsopack(name);
   if (! isopack)
     throw Error("no isopack " + name);
-
-  // If we aren't able to include legacy builds in this version, make sure that
-  // it has a fake dependency on isobuild:isopack-2 so that old versions of
-  // Isobuild won't accidentally use it.
-  if (!isopack.canWriteLegacyBuilds()
-      && !_.has(packageDeps, 'isobuild:isopack-2')) {
-    packageDeps['isobuild:isopack-2'] = {
-      constraint: '1.0.0',
-      // Arbitrary arch here; nothing other than meteor show really pays
-      // attention to reference arch anymore, because we no longer pay attention
-      // to the arch with the constraint in Version Solver.
-      references: [{arch: 'os'}],
-    };
-  }
 
   var sourceFiles = isopack.getSourceFilesUnderSourceRoot(
     packageSource.sourceRoot);

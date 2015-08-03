@@ -21,8 +21,6 @@ var finishIfNeedToPollQuery = function (f) {
   };
 };
 
-var currentId = 0;
-
 // OplogObserveDriver is an alternative to PollingObserveDriver which follows
 // the Mongo operation log instead of just re-polling the query. It obeys the
 // same simple interface: constructing it starts sending observeChanges
@@ -31,9 +29,6 @@ var currentId = 0;
 OplogObserveDriver = function (options) {
   var self = this;
   self._usesOplog = true;  // tests look at this
-
-  self._id = currentId;
-  currentId++;
 
   self._cursorDescription = options.cursorDescription;
   self._mongoHandle = options.mongoHandle;
@@ -118,7 +113,7 @@ OplogObserveDriver = function (options) {
       trigger, function (notification) {
         Meteor._noYieldsAllowed(finishIfNeedToPollQuery(function () {
           var op = notification.op;
-          if (notification.dropCollection || notification.dropDatabase) {
+          if (notification.dropCollection) {
             // Note: this call is not allowed to block on anything (especially
             // on waiting for oplog entries to catch up) because that will block
             // onOplogEntry!
@@ -142,39 +137,24 @@ OplogObserveDriver = function (options) {
       var fence = DDPServer._CurrentWriteFence.get();
       if (!fence)
         return;
-
-      if (fence._oplogObserveDrivers) {
-        fence._oplogObserveDrivers[self._id] = self;
-        return;
-      }
-
-      fence._oplogObserveDrivers = {};
-      fence._oplogObserveDrivers[self._id] = self;
-
-      fence.onBeforeFire(function () {
-        var drivers = fence._oplogObserveDrivers;
-        delete fence._oplogObserveDrivers;
-
-        // This fence cannot fire until we've caught up to "this point" in the
-        // oplog, and all observers made it back to the steady state.
+      var write = fence.beginWrite();
+      // This write cannot complete until we've caught up to "this point" in the
+      // oplog, and then made it back to the steady state.
+      Meteor.defer(function () {
         self._mongoHandle._oplogHandle.waitUntilCaughtUp();
-
-        _.each(drivers, function (driver) {
-          if (driver._stopped)
-            return;
-
-          var write = fence.beginWrite();
-          if (driver._phase === PHASE.STEADY) {
-            // Make sure that all of the callbacks have made it through the
-            // multiplexer and been delivered to ObserveHandles before committing
-            // writes.
-            driver._multiplexer.onFlush(function () {
-              write.committed();
-            });
-          } else {
-            driver._writesToCommitWhenWeReachSteady.push(write);
-          }
-        });
+        if (self._stopped) {
+          // We're stopped, so just immediately commit.
+          write.committed();
+        } else if (self._phase === PHASE.STEADY) {
+          // Make sure that all of the callbacks have made it through the
+          // multiplexer and been delivered to ObserveHandles before committing
+          // writes.
+          self._multiplexer.onFlush(function () {
+            write.committed();
+          });
+        } else {
+          self._writesToCommitWhenWeReachSteady.push(write);
+        }
       });
     }
   ));
@@ -284,7 +264,7 @@ _.extend(OplogObserveDriver.prototype, {
       self._published.set(id, self._sharedProjectionFn(newDoc));
       var projectedNew = self._projectionFn(newDoc);
       var projectedOld = self._projectionFn(oldDoc);
-      var changed = DiffSequence.makeChangedFields(
+      var changed = LocalCollection._makeChangedFields(
         projectedNew, projectedOld);
       if (!_.isEmpty(changed))
         self._multiplexer.changed(id, changed);

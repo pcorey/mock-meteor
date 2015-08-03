@@ -2,9 +2,9 @@ var _ = require('underscore');
 var tropohouse = require('./tropohouse.js');
 var release = require('./release.js');
 var runLog = require('./run-log.js');
-var catalog = require('./catalog/catalog.js');
+var catalog = require('./catalog.js');
 var archinfo = require('./archinfo.js');
-var isopack = require('./isobuild/isopack.js');
+var isopack = require('./isopack.js');
 var utils = require('./utils.js');
 var buildmessage = require('./buildmessage.js');
 var Console = require('./console.js').Console;
@@ -107,8 +107,6 @@ var maybeShowBanners = function () {
   if (release.forced)
     return;
 
-  const catalogUtils = require('./catalog/catalog-utils.js');
-
   // Didn't print a banner? Maybe we have a patch release to recommend.
   var track = release.current.getReleaseTrack();
   var patchReleaseVersion = releaseData.patchReleaseVersion;
@@ -120,7 +118,7 @@ var maybeShowBanners = function () {
       if (shouldShow(patchKey)) {
         runLog.log(
           "=> A patch (" +
-          catalogUtils.displayRelease(track, patchReleaseVersion) +
+          utils.displayRelease(track, patchReleaseVersion) +
           ") for your current release is available!");
         runLog.log("   Update this project now with 'meteor update --patch'.");
       }
@@ -139,7 +137,7 @@ var maybeShowBanners = function () {
     var futureReleaseKey = "futurerelease-" + track + "-" + futureReleases[0];
     if (shouldShow(futureReleaseKey)) {
       runLog.log(
-        "=> " + catalogUtils.displayRelease(track, futureReleases[0]) +
+        "=> " + utils.displayRelease(track, futureReleases[0]) +
         " is available. Update this project with 'meteor update'.");
     }
     return;
@@ -172,7 +170,7 @@ var updateMeteorToolSymlink = function (printErrors) {
 
   var localLatestReleaseLink = tropohouse.default.latestMeteorSymlink();
 
-  if (! localLatestReleaseLink.startsWith(relativeToolPath + files.pathSep)) {
+  if (! utils.startsWith(localLatestReleaseLink, relativeToolPath + files.pathSep)) {
     // The latest release from the catalog is not where the ~/.meteor/meteor
     // symlink points to. Let's make sure we have that release on disk,
     // and then update the symlink.

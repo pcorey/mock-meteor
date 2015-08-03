@@ -2,19 +2,14 @@
 (function () {
   'use strict';
 
-  // This file receives data from JSDoc via the `publish` exported function,
-  // and converts it into JSON that is written to a file.
-
   var fs = require('jsdoc/fs');
   var helper = require('jsdoc/util/templateHelper');
 
   var _ = require("underscore");
   var stringify = require("canonical-json");
 
-  // This is the big map of name -> data that we'll write to a file.
-  var dataContents = {};
-  // List of just the names, which we'll also write to a file.
   var names = [];
+  var dataContents = {};
 
   /**
    * Get a tag dictionary from the tags field on the object, for custom fields
@@ -34,41 +29,34 @@
     return tagDict;
   };
 
-  // Fix up a JSDoc entry and add it to `dataContents`.
-  var addToData = function (entry) {
-    _.extend(entry, getTagDict(entry));
+  var addToData = function (location, data) {
+    _.extend(data, getTagDict(data));
 
-    // strip properties we don't want
-    entry.comment = undefined;
-    entry.___id = undefined;
-    entry.___s = undefined;
-    entry.tags = undefined;
+    data.comment = undefined;
+    data.___id = undefined;
+    data.___s = undefined;
+    data.tags = undefined;
 
-    // generate `.filepath` and `.lineno` from `.meta`
-    if (entry.meta && entry.meta.path) {
+    if (data.meta && data.meta.path) {
       var packagesFolder = 'packages/';
-      var index = entry.meta.path.indexOf(packagesFolder);
+      var index = data.meta.path.indexOf(packagesFolder);
       if (index != -1) {
-        var fullFilePath = entry.meta.path.substr(index + packagesFolder.length) + '/' + entry.meta.filename;
-        entry.filepath = fullFilePath;
-        entry.lineno = entry.meta.lineno;
+        var fullFilePath = data.meta.path.substr(index + packagesFolder.length) + '/' + data.meta.filename;
+        data.filepath = fullFilePath;
+        data.lineno = data.meta.lineno;
       }
     }
 
-    entry.meta = undefined;
+    data.meta = undefined;
 
-    names.push(entry.longname);
-    dataContents[entry.longname] = entry;
+    names.push(location);
+    dataContents[location] = data;
   };
 
   /**
-   Entry point where JSDoc calls us.  It passes us data in the form of
-   a TaffyDB object (which is an in-JS database of sorts that you can
-   query for records.
-
-   @param {TAFFY} taffyData See <http://taffydb.com/>.
-   @param {object} opts
-   @param {Tutorial} tutorials
+    @param {TAFFY} taffyData See <http://taffydb.com/>.
+    @param {object} opts
+    @param {Tutorial} tutorials
    */
   exports.publish = function(taffyData) {
     var data = helper.prune(taffyData);
@@ -78,7 +66,7 @@
     // prepare all of the namespaces
     _.each(namespaces, function (namespace) {
       if (namespace.summary) {
-        addToData(namespace);
+        addToData(namespace.longname, namespace);
       }
     });
 
@@ -86,7 +74,7 @@
 
     _.each(properties, function (property) {
       if (property.summary) {
-        addToData(property);
+        addToData(property.longname, property);
       }
     });
 
@@ -96,7 +84,7 @@
     var callbacks = helper.find(data, {kind: "typedef"});
     _.each(callbacks, function (cb) {
       delete cb.comment;
-      addToData(cb);
+      addToData(cb.longname, cb);
     });
 
     var functions = helper.find(data, {kind: "function"});
@@ -115,11 +103,6 @@
       func.options = [];
       var filteredParams = [];
 
-      // Starting a param with `options.` makes it an option, not a
-      // param.  Dot (`.`) in this case binds tighter than comma, so
-      // `options.foo,bar` will create an option named `foo, bar`
-      // (representing two options in the docs).  We process pipes so
-      // that `options.foo|bar` also results in `foo, bar`.
       _.each(func.params, function (param) {
         param.name = param.name.replace(/,|\|/g, ", ");
 
@@ -138,11 +121,10 @@
 
       func.params = filteredParams;
 
-      // the entire unparsed doc comment.  takes up too much room in the
-      // data file.
+      // takes up too much room
       delete func.comment;
 
-      addToData(func);
+      addToData(func.longname, func);
     });
 
     // write full docs JSON

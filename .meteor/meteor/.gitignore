@@ -19,4 +19,3 @@ TAGS
 *.out
 npm-debug.log
 universe
-.babel-cache

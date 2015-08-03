@@ -6,11 +6,11 @@ var CS = ConstraintSolver;
 ////////// PackageAndVersion
 
 // An ordered pair of (package, version).
-CS.PackageAndVersion = function (pkg, version) {
-  check(pkg, String);
+CS.PackageAndVersion = function (package, version) {
+  check(package, String);
   check(version, String);
 
-  this.package = pkg;
+  this.package = package;
   this.version = version;
 };
 

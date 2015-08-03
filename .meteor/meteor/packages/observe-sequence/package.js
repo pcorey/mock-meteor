@@ -1,12 +1,11 @@
 Package.describe({
   summary: "Observe changes to various sequence types such as arrays, cursors and objects",
-  version: "1.0.7-plugins.0"
+  version: "1.0.6"
 });
 
 Package.onUse(function (api) {
   api.use('tracker');
-  api.use('mongo-id');  // for idStringify
-  api.use('diff-sequence');
+  api.use('minimongo');  // for idStringify
   api.use('underscore');
   api.use('random');
   api.export('ObserveSequence');

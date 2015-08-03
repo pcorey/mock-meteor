@@ -62,7 +62,7 @@ exports.cleanUpApp = function (sandbox, name) {
   }
 
   var run = sandbox.run('deploy', '-D', name);
-  run.waitSecs(180);
+  run.waitSecs(90);
   run.match('Deleted');
   run.expectExit(0);
   return name;
@@ -130,7 +130,7 @@ var getLoadedPackages = function () {
 };
 
 var ddpConnect = function (url) {
-  var DDP = getLoadedPackages()['ddp-client'].DDP;
+  var DDP = getLoadedPackages().ddp.DDP;
   return DDP.connect(url);
 };
 

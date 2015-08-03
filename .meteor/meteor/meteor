@@ -1,7 +1,6 @@
 #!/bin/bash
 
-# XXX the version 0.5.5 is used on branch cordova-improvements
-BUNDLE_VERSION=0.5.8
+BUNDLE_VERSION=0.4.18
 
 # OS Check. Put here because here is where we download the precompiled
 # bundles that are arch specific.
@@ -107,12 +106,10 @@ if [ -d "$SCRIPT_DIR/.git" ] || [ -f "$SCRIPT_DIR/.git" ]; then
         echo "Your dependency kit is out of date. I will download the new one." >&2
         install_dev_bundle
     fi
-
-    export BABEL_CACHE_DIR="$SCRIPT_DIR/.babel-cache"
 fi
 
 DEV_BUNDLE="$SCRIPT_DIR/dev_bundle"
-METEOR="$SCRIPT_DIR/tools/main-transpile-wrapper.js"
+METEOR="$SCRIPT_DIR/tools/main.js"
 
 
 # Bump our file descriptor ulimit as high as it will go. This is a

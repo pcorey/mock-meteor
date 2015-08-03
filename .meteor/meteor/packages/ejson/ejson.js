@@ -188,13 +188,6 @@ EJSON._isCustomType = function (obj) {
     _.has(customTypes, obj.typeName());
 };
 
-EJSON._getTypes = function () {
-  return customTypes;
-};
-
-EJSON._getConverters = function () {
-  return builtinConverters;
-};
 
 // for both arrays and objects, in-place modification.
 var adjustTypesToJSONValue =

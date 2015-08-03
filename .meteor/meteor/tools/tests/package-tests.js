@@ -5,7 +5,7 @@ var testUtils = require('../test-utils.js');
 var utils = require('../utils.js');
 var _= require('underscore');
 var packageClient = require("../package-client.js");
-var catalog = require('../catalog/catalog.js');
+var catalog = require('../catalog.js');
 
 var DEFAULT_RELEASE_TRACK = catalog.DEFAULT_TRACK;
 
@@ -250,7 +250,7 @@ selftest.define("change packages during hot code push", [], function () {
     s.write("package.js", "]");
     run.waitSecs(3);
     run.match("=> Errors prevented startup");
-    run.match("package.js:1: Unexpected token");
+    run.match("package.js:1:1: Unexpected token ]");
     run.match("Waiting for file change");
 
     s.write("package.js", packageJs);
@@ -473,7 +473,7 @@ selftest.define("update server package data unit test",
 
   var packageStorageFileDir = files.mkdtemp("update-server-package-data");
 
-  var rC = require('../catalog/catalog-remote.js');
+  var rC = require('../catalog-remote.js');
   var config = require('../config.js');
   var packageStorage = new rC.RemoteCatalog();
   var packageStorageFile = config.getPackageStorage({

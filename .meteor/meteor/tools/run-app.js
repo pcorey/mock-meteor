@@ -4,14 +4,14 @@ var Fiber = require('fibers');
 var fiberHelpers = require('./fiber-helpers.js');
 var files = require('./files.js');
 var watch = require('./watch.js');
-var bundler = require('./isobuild/bundler.js');
+var bundler = require('./bundler.js');
 var release = require('./release.js');
 var buildmessage = require('./buildmessage.js');
 var runLog = require('./run-log.js');
 var stats = require('./stats.js');
-var cordova = require('./cli/commands-cordova.js');
+var cordova = require('./commands-cordova.js');
 var Console = require('./console.js').Console;
-var catalog = require('./catalog/catalog.js');
+var catalog = require('./catalog.js');
 var Profile = require('./profile.js').Profile;
 
 // Parse out s as if it were a bash command line.
@@ -463,9 +463,6 @@ _.extend(AppRunner.prototype, {
     // a single invocation of _runOnce().
     var cachedServerWatchSet;
 
-    // Builders saved from previous iterations
-    var builders = {};
-
     var bundleApp = function () {
       if (! firstRun) {
         // If the build fails in a way that could be fixed by a refresh, allow
@@ -554,19 +551,13 @@ _.extend(AppRunner.prototype, {
           includeNodeModules = 'reference-directly';
         }
 
-        var bundleResult = bundler.bundle({
+        return bundler.bundle({
           projectContext: self.projectContext,
           outputPath: bundlePath,
           includeNodeModules: includeNodeModules,
           buildOptions: self.buildOptions,
-          hasCachedBundle: !! cachedServerWatchSet,
-          previousBuilders: builders
+          hasCachedBundle: !! cachedServerWatchSet
         });
-
-        // save new builders with their caches
-        ({builders} = bundleResult);
-
-        return bundleResult;
       });
 
       // Keep the server watch set from the initial bundle, because subsequent
@@ -708,22 +699,6 @@ _.extend(AppRunner.prototype, {
     }
 
     appProcess.start();
-    function maybePrintLintWarnings(bundleResult) {
-      if (! (self.projectContext.lintAppAndLocalPackages &&
-             bundleResult.warnings)) {
-        return;
-      }
-      if (bundleResult.warnings.hasMessages()) {
-        const formattedMessages = bundleResult.warnings.formatMessages();
-        runLog.log(
-          `Linted your app.\n\n${ formattedMessages }`,
-          { arrow: true });
-      } else {
-        runLog.log('Linted your app. No linting errors.',
-                   { arrow: true });
-      }
-    }
-    maybePrintLintWarnings(bundleResult);
 
     // Start watching for changes for files if requested. There's no
     // hurry to do this, since clientWatchSet contains a snapshot of the
@@ -776,8 +751,6 @@ _.extend(AppRunner.prototype, {
         if (bundleResultOrRunResult.runResult)
           return bundleResultOrRunResult.runResult;
         bundleResult = bundleResultOrRunResult.bundleResult;
-
-        maybePrintLintWarnings(bundleResult);
 
         var oldFuture = self.runFuture = new Future;
 

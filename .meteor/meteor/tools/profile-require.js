@@ -59,15 +59,14 @@ exports.start = function () {
   currentInvocation = new RequireInvocation('TOP');
 
   var realLoader = moduleModule._load;
-  moduleModule._load = function (...args) {
-    var [id, { filename }] = args;
-    var inv = new RequireInvocation(id, filename);
+  moduleModule._load = function (/* arguments */) {
+    var inv = new RequireInvocation(arguments[0], arguments[1].filename);
     var parent = currentInvocation;
     currentInvocation.children.push(inv);
     currentInvocation = inv;
 
     try {
-      return realLoader.apply(this, args);
+      return realLoader.apply(this, arguments);
     } finally {
       inv.timeFinished = now();
       currentInvocation = parent;

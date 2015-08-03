@@ -18,14 +18,12 @@ var _ = require('underscore');
 // 4. Print the results and exit with the appropriate exit code.
 var runVelocity = function (url) {
   var unipackages = isopackets.load('ddp');
-  var DDP = unipackages['ddp-client'].DDP;
+  var DDP = unipackages.ddp.DDP;
 
   // XXX maybe a startup message so users know the tests are running.
 
   // All running browser processes that visit the mirror pages
   var browserProcesses = [];
-  // Maps mirror id to url
-  var mirrorUrls = {};
   var ddpConnection = DDP.connect(url);
 
   var killBrowserProcesses = function () {
@@ -131,50 +129,13 @@ var runVelocity = function (url) {
         }, onReady: function () {
           this.connection.registerStore("velocityMirrors", {
             update: function (msg) {
-              if (isMirrorUrlMessage(msg)) {
-                mirrorUrls[msg.id] = generateMirrorUrl(
-                  msg.fields.rootUrl,
-                  msg.fields.rootUrlPath
-                );
-              }
-              if (isMirrorReadyMessage(msg)) {
-                var mirrorUrl = mirrorUrls[msg.id];
-                if (mirrorUrl) {
-                  visitWithPhantom(mirrorUrl);
-                } else {
-                  Console.error(
-                    "Could not find URL of mirror " +
-                    "with the MongoDB ID " + msg.id
-                  );
-                }
+              if (msg.msg === "added") {
+                visitWithPhantom(msg.fields.rootUrl);
               }
             }
           });
         }
       });
-
-      function isUpdateMessage(msg) {
-        return msg.msg === "added" || msg.msg === "changed";
-      }
-
-      function isMirrorUrlMessage(msg) {
-        return isUpdateMessage(msg) && msg.fields.rootUrl;
-      }
-
-      function isMirrorReadyMessage(msg) {
-        return isUpdateMessage(msg) && msg.fields.state === "ready";
-      }
-
-      function generateMirrorUrl(rootUrl, rootUrlPath) {
-        var mirrorUrl = rootUrl;
-        // Handle the breaking change in velocity:core 0.5
-        // See: https://github.com/meteor-velocity/velocity/issues/260
-        if (rootUrlPath && mirrorUrl.indexOf(rootUrlPath) === -1) {
-          mirrorUrl += rootUrlPath;
-        }
-
-        return mirrorUrl;
-      }
     }
   }, 2000);
 };

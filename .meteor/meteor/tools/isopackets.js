@@ -1,13 +1,13 @@
 var _ = require('underscore');
-var bundler = require('./isobuild/bundler.js');
-var Builder = require('./isobuild/builder.js');
+var bundler = require('./bundler.js');
+var Builder = require('./builder.js');
 var buildmessage = require('./buildmessage.js');
 var files = require('./files.js');
-var compiler = require('./isobuild/compiler.js');
+var compiler = require('./compiler.js');
 var config = require('./config.js');
 var watch = require('./watch.js');
 var Console = require('./console.js').Console;
-var isopackCacheModule = require('./isobuild/isopack-cache.js');
+var isopackCacheModule = require('./isopack-cache.js');
 var packageMapModule = require('./package-map.js');
 var fiberHelpers = require('./fiber-helpers.js');
 
@@ -37,16 +37,20 @@ var fiberHelpers = require('./fiber-helpers.js');
 // process if any of their sources have changed.
 //
 // Example usage:
-//   var DDP = require('./isopackets.js').load('ddp')['ddp-client'].DDP;
+//   var DDP = require('./isopackets.js').load('ddp').ddp.DDP;
 //   var reverse = DDP.connect('reverse.meteor.com');
 //   Console.info(reverse.call('reverse', 'hello world'));
 
 
 // All of the defined isopackets. Whenever they are being built, they will be
-// built in the order listed here.
+// built in the order listed here (which is mostly relevant for js-analyze).
 var ISOPACKETS = {
-  'ddp': ['ddp-client'],
-  'mongo': ['npm-mongo'],
+  // Note: when running from a checkout, js-analyze must always be the
+  // the first to be rebuilt, because it might need to be loaded as part
+  // of building other isopackets.
+  'js-analyze': ['js-analyze'],
+  'ddp': ['ddp'],
+  'mongo': ['mongo'],
   'ejson': ['ejson'],
   'minifiers': ['minifiers'],
   'constraint-solver': ['constraint-solver'],
@@ -65,10 +69,8 @@ var ISOPACKETS = {
 //
 // The subtlety here is that when running from a checkout, we don't want to
 // accidentally load an isopacket before ensuring that it doesn't need to be
-// rebuilt. We used to need to load a "js-analyze" isopacket as part
-// of building other isopackets in ensureIsopacketsLoadable which made this
-// more important, though we've simplified it now by moving that code into
-// the tool itself.
+// rebuilt. But we do want to be able to load the js-analyze isopacket as part
+// of building other isopackets in ensureIsopacketsLoadable.
 var loadedIsopackets = {};
 
 // The main entry point: loads and returns an isopacket from cache or from
@@ -124,7 +126,8 @@ var ensureIsopacketsLoadable = function () {
 
   var failedPackageBuild = false;
   // Look at each isopacket. Check to see if it's on disk and up to date. If
-  // not, build it. We rebuild them in the order listed in ISOPACKETS.
+  // not, build it. We rebuild them in the order listed in ISOPACKETS, which
+  // ensures that we deal with js-analyze first.
   var messages = Console.withProgressDisplayVisible(function () {
     return buildmessage.capture(function () {
       _.each(ISOPACKETS, function (packages, isopacketName) {
@@ -202,7 +205,7 @@ var newIsopacketBuildingCatalog = function () {
   if (! files.inCheckout())
     throw Error("No need to build isopackets unless in checkout!");
 
-  var catalogLocal = require('./catalog/catalog-local.js');
+  var catalogLocal = require('./catalog-local.js');
   var isopacketCatalog = new catalogLocal.LocalCatalog;
   var messages = buildmessage.capture(
     { title: "scanning local core packages" },

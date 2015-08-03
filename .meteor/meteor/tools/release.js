@@ -1,7 +1,7 @@
 var _ = require('underscore');
 var files = require('./files.js');
 var warehouse = require('./warehouse.js');
-var catalog = require('./catalog/catalog.js');
+var catalog = require('./catalog.js');
 var utils = require('./utils.js');
 var buildmessage = require('./buildmessage.js');
 
@@ -124,11 +124,9 @@ _.extend(Release.prototype, {
 
   getDisplayName: function (options) {
     var self = this;
-    const catalogUtils = require('./catalog/catalog-utils.js');
-    return catalogUtils.displayRelease(
-      self.getReleaseTrack(),
-      self.getReleaseVersion(),
-      options);
+    return utils.displayRelease(self.getReleaseTrack(),
+                                self.getReleaseVersion(),
+                                options);
   }
 });
 

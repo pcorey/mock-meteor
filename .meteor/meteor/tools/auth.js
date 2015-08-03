@@ -21,7 +21,7 @@ var getLoadedPackages = function () {
 // Opens and returns a DDP connection to the accounts server. Remember
 // to close it when you're done with it!
 var openAccountsConnection = function () {
-  var DDP = getLoadedPackages()['ddp-client'].DDP;
+  var DDP = getLoadedPackages().ddp.DDP;
   return DDP.connect(config.getAuthDDPUrl(), {
     headers: { 'User-Agent': httpHelpers.getUserAgent() }
   });
@@ -31,8 +31,9 @@ var openAccountsConnection = function () {
 // that is a connection to the accounts server, which gets closed when
 // `f` returns or throws.
 var withAccountsConnection = function (f) {
-  return function (...args) {
+  return function (/* arguments */) {
     var self = this;
+    var args = _.toArray(arguments);
     var conn = openAccountsConnection();
     args.push(conn);
     try {
@@ -50,7 +51,7 @@ var withAccountsConnection = function (f) {
 // XXX if we reconnect we won't reauthenticate. Fix that before using
 // this for long-lived connections.
 var loggedInAccountsConnection = function (token) {
-  var connection = getLoadedPackages()['ddp-client'].DDP.connect(
+  var connection = getLoadedPackages().ddp.DDP.connect(
     config.getAuthDDPUrl()
   );
 
@@ -96,7 +97,8 @@ var loggedInAccountsConnection = function (token) {
 //    provided, one will be opened and then closed before returning.
 var sessionMethodCaller = function (methodName, options) {
   options = options || {};
-  return function (...args) {
+  return function (/* arguments */) {
+    var args = _.toArray(arguments);
     args.push({
       session: auth.getSessionId(config.getAccountsDomain()) || null
     });
@@ -149,7 +151,7 @@ var writeSessionData = function (data) {
           files.pathJoin(files.pathDirname(sessionPath), '.meteorsession.' +
                     Math.floor(Math.random() * 999999));
     try {
-      var fd = files.open(tempPath, 'wx', 0o600);
+      var fd = files.open(tempPath, 'wx', 0600);
     } catch (e) {
       continue;
     }
@@ -869,6 +871,7 @@ exports.loggedInUsername = function () {
 exports.getAccountsConfiguration = function (conn) {
   // Subscribe to the package server's service configurations so that we
   // can get the OAuth client ID to kick off the OAuth flow.
+  var Package = getLoadedPackages();
   var accountsConfiguration = null;
 
   // We avoid the overhead of creating a 'ddp-and-mongo' isopacket (or

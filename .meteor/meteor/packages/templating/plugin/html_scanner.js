@@ -7,11 +7,11 @@ html_scanner = {
   // and ignores top-level HTML comments.
 
   // Has fields 'message', 'line', 'file'
-  ParseError: function () {},
-  BodyAttrsError: function () {},
+  ParseError: function () {
+  },
 
-  // Note: source_name is only used for errors (so it's not part of the cache
-  // key in compile-templates.js).
+  bodyAttributes : [],
+
   scan: function (contents, source_name) {
     var rest = contents;
     var index = 0;
@@ -21,22 +21,13 @@ html_scanner = {
       index += amount;
     };
 
-    var throwSpecialError = function (msg, errorClass, overrideIndex) {
-      var ret = new errorClass;
-      ret.message = msg;
+    var throwParseError = function (msg, overrideIndex) {
+      var ret = new html_scanner.ParseError;
+      ret.message = msg || "bad formatting in HTML template";
       ret.file = source_name;
       var theIndex = (typeof overrideIndex === 'number' ? overrideIndex : index);
       ret.line = contents.substring(0, theIndex).split('\n').length;
       throw ret;
-    };
-    var throwParseError = function (msg, overrideIndex) {
-      throwSpecialError(
-        msg || "bad formatting in template file",
-        html_scanner.ParseError,
-        overrideIndex);
-    };
-    var throwBodyAttrsError = function (msg) {
-      throwSpecialError(msg, html_scanner.BodyAttrsError);
     };
 
     var results = html_scanner._initResults();
@@ -48,8 +39,7 @@ html_scanner = {
 
       var match = rOpenTag.exec(rest);
       if (! match)
-        throwParseError("Expected <template>, <head>, or <body> tag" +
-                        " in template file");
+        throwParseError(); // unknown text encountered
 
       var matchToken = match[1];
       var matchTokenTagName =  match[3];
@@ -65,7 +55,7 @@ html_scanner = {
         // top-level HTML comment
         var commentEnd = /--\s*>/.exec(rest);
         if (! commentEnd)
-          throwParseError("unclosed HTML comment in template file");
+          throwParseError("unclosed HTML comment");
         advance(commentEnd.index + commentEnd[0].length);
         continue;
       }
@@ -110,10 +100,6 @@ html_scanner = {
       var tagContents = rest.slice(0, end.index);
       var contentsStartIndex = index;
 
-      if (tagName === 'body') {
-        this._addBodyAttrs(results, tagAttribs, throwBodyAttrsError);
-      }
-
       // act on the tag
       html_scanner._handleTag(results, tagName, tagAttribs, tagContents,
                               throwParseError, contentsStartIndex,
@@ -131,21 +117,7 @@ html_scanner = {
     results.head = '';
     results.body = '';
     results.js = '';
-    results.bodyAttrs = {};
     return results;
-  },
-
-  _addBodyAttrs: function (results, attrs, throwBodyAttrsError) {
-    Object.keys(attrs).forEach(function (attr) {
-      var val = attrs[attr];
-
-      if (results.bodyAttrs.hasOwnProperty(attr) && results.bodyAttrs[attr] !== val) {
-        throwBodyAttrsError(
-          "<body> declarations have conflicting values for the '" + attr + "' attribute.");
-      }
-
-      results.bodyAttrs[attr] = val;
-    });
   },
 
   _handleTag: function (results, tag, attribs, contents, throwParseError,
@@ -200,6 +172,9 @@ html_scanner = {
       } else {
         // <body>
         if (hasAttribs) {
+          // XXX we would want to throw an error here if we have duplicate
+          // attributes, but this is complex to do with the current build system
+          // so we won't.
           results.js += "\nMeteor.startup(function() { $('body').attr(" + JSON.stringify(attribs) + "); });\n";
         }
 

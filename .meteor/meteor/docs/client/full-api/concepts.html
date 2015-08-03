@@ -141,13 +141,6 @@ treated specially by Meteor:
     Any directory named `tests` is not loaded anywhere. Use this for any local
     test code.
 
-- **node_modules**
-
-    For compatibility with node.js tools used alongside Meteor, any directory named
-    `node_modules` is not loaded anywhere. node.js packages installed into
-    `node_modules` directories will not be available to your Meteor code. Use
-    `Npm.depends` in your package `package.js` file for that.
-
 ### Files outside special directories
 
 All JavaScript files outside special directories are loaded on both the client
@@ -511,7 +504,6 @@ These Meteor functions run your code as a reactive computation:
 
 * [Templates](#livehtmltemplates)
 * [`Tracker.autorun`](#tracker_autorun)
-* [`Template.autorun`](#template_autorun)
 * [`Blaze.render`](#blaze_render) and [`Blaze.renderWithData`](#blaze_renderwithdata)
 
 And the reactive data sources that can trigger changes are:
@@ -555,7 +547,7 @@ Meteor's live page update technology. Just write your template as you normally
 would, and Meteor will take care of making it update in realtime.
 
 Meteor ships with a templating language called
-[Spacebars](https://github.com/meteor/meteor/blob/master/packages/spacebars/README.md),
+[Spacebars](https://github.com/meteor/meteor/blob/devel/packages/spacebars/README.md),
 inspired by [Handlebars](http://handlebarsjs.com/).  It shares some of the
 spirit and syntax of Handlebars, but it has been tailored to produce reactive
 Meteor templates when compiled.
@@ -705,7 +697,7 @@ Template.playerScore.events({
 ```
 
 For more details about Spacebars, read [the Spacebars
-README](https://github.com/meteor/meteor/blob/master/packages/spacebars/README.md).
+README](https://github.com/meteor/meteor/blob/devel/packages/spacebars/README.md).
 
 {{/markdown}}
 </template>
@@ -752,9 +744,7 @@ In addition to the packages in the official Meteor release being used by your
 app, `meteor list` and `meteor add` also search the `packages` directory at the
 top of your app. You can also use the `packages` directory to break your app
 into subpackages for your convenience, or to test packages that you might want
-to publish. See [Writing Packages](#writingpackages). If you wish to add
-packages outside of your app's folder structure, set the environment variable
-`PACKAGE_DIRS` to a colon-delimited list of paths.
+to publish. See [Writing Packages](#writingpackages).
 
 {{/markdown}}
 </template>
@@ -871,7 +861,9 @@ wanted: an easy way to take an app idea, flesh it out over a weekend,
 and put it out there for the world to use, with nothing getting in the
 way of creativity.
 
-    $ meteor deploy myapp.meteor.com
+```bash
+meteor deploy myapp.meteor.com
+```
 
 Your application is now available at myapp.meteor.com.  If
 this is the first time deploying to this hostname, Meteor creates a
@@ -882,7 +874,9 @@ code.
 You can also deploy to your own domain.  Just set up the hostname you
 want to use as a CNAME to `origin.meteor.com`, then deploy to that name.
 
-    $ meteor deploy www.myapp.com
+```bash
+meteor deploy www.myapp.com
+```
 
 We provide this as a free service so you can try Meteor.  It is also
 helpful for quickly putting up internal betas, demos, and so on. For
@@ -895,18 +889,20 @@ hosting provider that can run Node.js apps.
 
 To get started, run
 
-    $ meteor build my_directory
+```bash
+meteor build my_directory
+```
 
 This command will generate a fully-contained Node.js application in the form of
 a tarball.  To run this application, you need to provide Node.js 0.10 and a
 MongoDB server.  (The current release of Meteor has been tested with Node
-0.10.40.) You can then run the application by invoking node, specifying the
+0.10.36.) You can then run the application by invoking node, specifying the
 HTTP port for the application to listen on, and the MongoDB endpoint.
 
 ```bash
-$ cd my_directory
-$ (cd programs/server && npm install)
-$ PORT=3000 MONGO_URL=mongodb://localhost:27017/myapp node main.js
+cd my_directory
+(cd programs/server && npm install)
+env PORT=3000 MONGO_URL=mongodb://localhost:27017/myapp node main.js
 ```
 
 Some packages might require other environment variables. For example,

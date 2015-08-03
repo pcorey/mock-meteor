@@ -15,23 +15,7 @@ var EXITING_MESSAGE =
 // Invoked by the server process to listen for incoming connections from
 // shell clients. Each connection gets its own REPL instance.
 exports.listen = function listen(shellDir) {
-  function callback() {
-    new Server(shellDir).listen();
-  }
-
-  // If the server is still in the very early stages of starting up,
-  // Meteor.startup may not available yet.
-  if (typeof Meteor === "object") {
-    Meteor.startup(callback);
-  } else if (typeof __meteor_bootstrap__ === "object") {
-    var hooks = __meteor_bootstrap__.startupHooks;
-    if (hooks) {
-      hooks.push(callback);
-    } else {
-      // As a fallback, just call the callback asynchronously.
-      process.nextTick(callback);
-    }
-  }
+  new Server(shellDir).listen();
 };
 
 // Disabling the shell causes all attached clients to disconnect and exit.
@@ -174,14 +158,9 @@ Sp.startREPL = function startREPL(options) {
   // History persists across shell sessions!
   self.initializeHistory();
 
-  // Save the global `_` object in the server.  This is probably defined by the
-  // underscore package.  It is unlikely to be the same object as the `var _ =
-  // require('underscore')` in this file!
-  var originalUnderscore = repl.context._;
-
   Object.defineProperty(repl.context, "_", {
     // Force the global _ variable to remain bound to underscore.
-    get: function () { return originalUnderscore; },
+    get: function () { return _; },
 
     // Expose the last REPL result as __ instead of _.
     set: function(lastResult) {

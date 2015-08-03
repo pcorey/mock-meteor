@@ -1,83 +1,23 @@
 {
   "dependencies": {
     "css-parse": {
-      "version": "2.0.0",
-      "dependencies": {
-        "css": {
-          "version": "2.2.0",
-          "dependencies": {
-            "source-map": {
-              "version": "0.1.43",
-              "dependencies": {
-                "amdefine": {
-                  "version": "0.1.1"
-                }
-              }
-            },
-            "source-map-resolve": {
-              "version": "0.3.1",
-              "dependencies": {
-                "source-map-url": {
-                  "version": "0.3.0"
-                },
-                "atob": {
-                  "version": "1.1.2"
-                },
-                "resolve-url": {
-                  "version": "0.2.1"
-                }
-              }
-            },
-            "urix": {
-              "version": "0.1.0"
-            },
-            "inherits": {
-              "version": "2.0.1"
-            }
-          }
-        }
-      }
+      "version": "https://github.com/reworkcss/css-parse/tarball/aa7e23285375ca621dd20250bac0266c6d8683a5"
     },
     "css-stringify": {
-      "version": "2.0.0",
+      "version": "https://github.com/reworkcss/css-stringify/tarball/a7fe6de82e055d41d1c5923ec2ccef06f2a45efa",
       "dependencies": {
-        "css": {
-          "version": "2.2.0",
+        "source-map": {
+          "version": "0.1.33",
           "dependencies": {
-            "source-map": {
-              "version": "0.1.43",
-              "dependencies": {
-                "amdefine": {
-                  "version": "0.1.1"
-                }
-              }
-            },
-            "source-map-resolve": {
-              "version": "0.3.1",
-              "dependencies": {
-                "source-map-url": {
-                  "version": "0.3.0"
-                },
-                "atob": {
-                  "version": "1.1.2"
-                },
-                "resolve-url": {
-                  "version": "0.2.1"
-                }
-              }
-            },
-            "urix": {
+            "amdefine": {
               "version": "0.1.0"
-            },
-            "inherits": {
-              "version": "2.0.1"
             }
           }
         }
       }
     },
     "uglify-js": {
-      "version": "2.4.20",
+      "version": "2.4.17",
       "dependencies": {
         "async": {
           "version": "0.2.10"
@@ -91,21 +31,7 @@
           }
         },
         "yargs": {
-          "version": "3.5.4",
-          "dependencies": {
-            "camelcase": {
-              "version": "1.0.2"
-            },
-            "decamelize": {
-              "version": "1.0.0"
-            },
-            "window-size": {
-              "version": "0.1.0"
-            },
-            "wordwrap": {
-              "version": "0.0.2"
-            }
-          }
+          "version": "1.3.3"
         },
         "uglify-to-browserify": {
           "version": "1.0.2"

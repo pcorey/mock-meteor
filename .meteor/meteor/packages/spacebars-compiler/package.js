@@ -1,6 +1,6 @@
 Package.describe({
   summary: "Compiler for Spacebars template language",
-  version: '1.0.7-plugins.1'
+  version: '1.0.6'
 });
 
 Package.onUse(function (api) {
@@ -17,7 +17,6 @@ Package.onUse(function (api) {
   api.use('minifiers', ['server'], { weak: true });
   api.addFiles(['templatetag.js',
                  'optimizer.js',
-                 'react.js',
                  'codegen.js',
                  'compiler.js']);
 });

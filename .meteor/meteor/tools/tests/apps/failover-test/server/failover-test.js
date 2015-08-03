@@ -82,3 +82,7 @@ C.find().observeChanges({
 setNextStepTimeout();
 
 C.insert({step: 'initialized'});
+
+main = function (argv) {
+  return 'DAEMON';
+};

@@ -17,5 +17,4 @@ code can read `data.txt` by running:
 
     var data = Assets.getText('nested/data.txt');
 
-Note: Packages can only access their own assets. If you need to read the assets of a different package, or of the enclosing app, you need to get a reference to that package's `Assets` object.
 {{/template}}

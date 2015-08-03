@@ -48,18 +48,7 @@ var spawnMongod = function (mongodPath, port, dbPath, replSetName) {
       // initializes faster. (Not recommended for production!)
       '--oplogSize', '8',
       '--replSet', replSetName
-  ], {
-    // Apparently in some contexts, Mongo crashes if your locale isn't set up
-    // right. I wasn't able to reproduce it, but many people on #4019
-    // were. Let's default a couple environment variables to English UTF-8 if
-    // they aren't set already. If these few aren't good enough, we'll at least
-    // detect the locale error and print a link to #4019 (look for
-    // `detectedErrors.badLocale` below).
-    env: _.extend({
-      LANG: 'en_US.UTF-8',
-      LC_ALL: 'en_US.UTF-8'
-    }, process.env)
-  });
+    ]);
 };
 
 // Find all running Mongo processes that were started by this program
@@ -95,10 +84,7 @@ if (process.platform === 'win32') {
           });
 
           // Now get the corresponding port numbers
-          child_process.exec(
-            'netstat -ano',
-            {maxBuffer: 1024 * 1024 * 10},
-            function (error, stdout, stderr) {
+          child_process.exec('netstat -ano', function (error, stdout, stderr) {
             if (error) {
               fut['throw'](new Error("Couldn't run netstat -ano: " +
                 JSON.stringify(error)));
@@ -138,37 +124,8 @@ if (process.platform === 'win32') {
     var fut = new Future;
 
     // 'ps ax' should be standard across all MacOS and Linux.
-    // However, ps on OS X corrupts some non-ASCII characters in arguments,
-    // such as т (CYRILLIC SMALL LETTER TE), leading to this function
-    // failing to properly match pathnames with those characters.  #3999
-    //
-    // pgrep appears to do a better job (and has output that is roughly
-    // similar; it lacks a few fields that we don't care about).  Plus,
-    // it can do some of the grepping for us.
-    //
-    // However, 'pgrep' only started shipping with OS X 10.8 (and may be less
-    // common on Linux too), so we check to see if it exists and fall back to
-    // 'ps' if we can't find it.
-    //
-    // We avoid using pgrep on Linux, because some versions of Linux pgrep
-    // require you to pass -a/--list-full to include the arguments in the
-    // output, and other versions fail if you pass that option. We have not
-    // observed the Unicode corruption on Linux, so using ps ax there is fine.
-    var psScript = 'ps ax';
-    if (process.platform === 'darwin') {
-      psScript =
-        'if type pgrep >/dev/null 2>&1; then ' +
-        // -lf means to display and match against full argument lists.
-        // pgrep exits 1 if no processes match the argument; we're OK
-        // considering this as a success, but we don't want other errors
-        // to be ignored.  Note that this is sh not bash, so we can't use
-        // [[.
-        'pgrep -lf mongod; test "$?" -eq 0 -o "$?" -eq 1;' +
-        'else ps ax; fi';
-    }
-
     child_process.exec(
-      psScript,
+      'ps ax',
       // we don't want this to randomly fail just because you're running lots of
       // processes. 10MB should be more than ps ax will ever spit out; the default
       // is 200K, which at least one person hit (#2158).
@@ -257,11 +214,11 @@ if (process.platform === 'win32') {
     var client = net.connect({port: mongoPort}, function() {
       // The server is running.
       client.end();
-      mongoTestConnectFuture.isResolved() || mongoTestConnectFuture.return();
+      mongoTestConnectFuture.return();
     });
     client.on('error', function () {
       mongoPort = null;
-      mongoTestConnectFuture.isResolved() || mongoTestConnectFuture.return();
+      mongoTestConnectFuture.return();
     });
     mongoTestConnectFuture.wait();
 
@@ -369,10 +326,13 @@ var launchMongo = function (options) {
   var stopFuture = new Future;
 
   // Like Future.wrap and _.bind in one.
-  var yieldingMethod = function (object, methodName, ...args) {
+  var yieldingMethod = function (/* object, methodName, args */) {
+    var args = _.toArray(arguments);
+    var object = args.shift();
+    var methodName = args.shift();
     var f = new Future;
     args.push(f.resolver());
-    object[methodName](...args);
+    object[methodName].apply(object, args);
     return fiberHelpers.waitForOne(stopFuture, f);
   };
 
@@ -391,7 +351,7 @@ var launchMongo = function (options) {
 
   var launchOneMongoAndWaitForReadyForInitiate = function (dbPath, port,
                                                            portFile) {
-    files.mkdir_p(dbPath, 0o755);
+    files.mkdir_p(dbPath, 0755);
 
     var proc = null;
     var procExitHandler;
@@ -404,7 +364,7 @@ var launchMongo = function (options) {
       // This is only for testing, so we're OK with incurring the replset
       // setup on each startup.
       files.rm_recursive(dbPath);
-      files.mkdir_p(dbPath, 0o755);
+      files.mkdir_p(dbPath, 0755);
     } else if (portFile) {
       var portFileExists = false;
       var matchingPortFileExists = false;
@@ -514,10 +474,6 @@ var launchMongo = function (options) {
       if (/Insufficient free space/.test(data)) {
         detectedErrors.freeSpace = true;
       }
-
-      if (/Invalid or no user locale set/.test(data)) {
-        detectedErrors.badLocale = true;
-      }
     });
     proc.stdout.setEncoding('utf8');
     proc.stdout.on('data', stdoutOnData);
@@ -536,7 +492,7 @@ var launchMongo = function (options) {
     try {
       // Load mongo so we'll be able to talk to it.
       var mongoNpmModule =
-            isopackets.load('mongo')['npm-mongo'].NpmModuleMongodb;
+            isopackets.load('mongo').mongo.MongoInternals.NpmModule;
 
       // Connect to the intended primary and start a replset.
       var db = new mongoNpmModule.Db(
@@ -845,12 +801,6 @@ _.extend(MRp, {
 "Looks like you are trying to run Meteor on an old Linux distribution.\n" +
 "Meteor on Linux requires glibc version 2.9 or above. Try upgrading your\n" +
 "distribution to the latest version.";
-    }
-
-    if (detectedErrors.badLocale) {
-      message += "\n\n" +
-"Looks like MongoDB doesn't understand your locale settings. See\n" +
-"https://github.com/meteor/meteor/issues/4019 for more details.";
     }
 
     runLog.log(message);

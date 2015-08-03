@@ -1,13 +1,15 @@
 require('./base.js');
 
-var Fiber = require("fibers");
+//console.log('Meteor', Meteor);
 
-Fiber(function() {
-  //console.log('in fiber', Meteor);
-  Meteor.startup(function(){
-    console.log('start!');
-  });
-}).run();
+// var Fiber = require("fibers");
+
+// Fiber(function() {
+//   //console.log('in fiber', Meteor);
+//   Meteor.startup(function(){
+//     console.log('start!');
+//   });
+// }).run();
 // // Meteor.bindEnvironment(function() {
 //   describe('test', function() {
 //     it('returns 123', function() {

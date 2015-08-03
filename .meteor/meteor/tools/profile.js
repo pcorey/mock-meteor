@@ -165,7 +165,6 @@ var _ = require('underscore');
 var Fiber = require('fibers');
 
 var enabled = !! process.env['METEOR_PROFILE'];
-var filter = ~~process.env['METEOR_PROFILE'] || 100; // ms
 
 var bucketTimes = {};
 
@@ -189,13 +188,13 @@ var Profile = function (bucketName, f) {
   if (! enabled)
     return f;
 
-  return function (...args) {
+  return function (/*arguments*/) {
     if (! running)
-      return f.apply(this, args);
+      return f.apply(this, arguments);
 
     var name;
     if (_.isFunction(bucketName))
-      name = bucketName.apply(this, args);
+      name = bucketName.apply(this, arguments);
     else
       name = bucketName;
 
@@ -212,7 +211,7 @@ var Profile = function (bucketName, f) {
     var start = process.hrtime();
     var err = null;
     try {
-      return f.apply(this, args);
+      return f.apply(this, arguments);
     }
     catch (e) {
       err = e;
@@ -256,6 +255,10 @@ var print = function (indent, text) {
   console.log(prefix + spaces(indent * 2) + text);
 };
 
+var startsWith = function (s1, s2) {
+  return (s1.substr(0, s2.length) === s2);
+};
+
 var isChild = function (entry1, entry2) {
   return (entry2.length === entry1.length + 1 &&
           _.isEqual(entry1, entry2.slice(0, entry1.length)));
@@ -276,7 +279,6 @@ var isLeaf = function (entry) {
 };
 
 var reportOnLeaf = function (level, entry) {
-  if (entryTime(entry) < filter) return;
   print(
     level,
     _.last(entry) + ": " + entryTime(entry).toFixed(1));
@@ -299,7 +301,6 @@ var injectOtherTime = function (entry) {
 };
 
 var reportOnParent = function (level, entry) {
-  if (entryTime(entry) < filter) return;
   print(level, entryName(entry) + ": " + entryTime(entry).toFixed(1));
   _.each(children(entry), function (child) {
     reportOn(level + 1, child);
@@ -346,7 +347,6 @@ var reportTotals = function () {
   });
   var grandTotal = 0;
   _.each(totals, function (total) {
-    if (total.time < filter) return;
     print(0, total.name + ": " + total.time.toFixed(1));
     grandTotal += total.time;
   });
