@@ -1,7 +1,7 @@
 var url = require('url');
 var files = require('./files.js');
 var _ = require('underscore');
-var tropohouse = require('./tropohouse.js');
+var tropohouse = require('./packaging/tropohouse.js');
 
 // A few functions in the `meteor` tool talk to MDG servers: primarily
 // checking for updates, logging into your Meteor account, and
@@ -201,7 +201,7 @@ _.extend(exports, {
     serverUrl = serverUrl.replace(/\.meteor\.com$/, '');
 
     // Replace other weird stuff with X.
-    serverUrl = serverUrl.replace(/[^a-zA-Z0-9.:-]/g, 'X');
+    serverUrl = serverUrl.replace(/[^a-zA-Z0-9.-]/g, 'X');
 
     return serverUrl;
   },

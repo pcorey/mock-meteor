@@ -1,6 +1,6 @@
 var selftest = require('../selftest.js');
 var config = require("../config.js");
-var catalogRemote = require("../catalog-remote.js");
+var catalogRemote = require("../catalog/catalog-remote.js");
 var buildmessage = require("../buildmessage.js");
 var Sandbox = selftest.Sandbox;
 
@@ -139,7 +139,8 @@ selftest.define("autoupdate", ['checkout'], function () {
 
     run = s.run("update");
     run.match("myapp: updated to Meteor v3.\n");
-    run.match("Your packages are at their latest compatible versions.\n");
+    run.match("Your top-level dependencies are at their latest compatible " +
+              "versions.\n");
     run.expectExit(0);
 
     run = s.run("--version");

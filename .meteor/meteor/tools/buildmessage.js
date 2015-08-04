@@ -128,9 +128,13 @@ _.extend(Job.prototype, {
 
 // A MessageSet contains a set of jobs, which in turn each contain a
 // set of messages.
-var MessageSet = function () {
+var MessageSet = function (messageSet) {
   var self = this;
   self.jobs = [];
+
+  if (messageSet) {
+    self.jobs = _.clone(messageSet.jobs);
+  }
 };
 
 _.extend(MessageSet.prototype, {
@@ -430,9 +434,10 @@ var error = function (message, options) {
   if ('useMyCaller' in info) {
     if (info.useMyCaller) {
       info.stack = parseStack.parse(new Error()).slice(2);
-      var howManyToSkip = (
-        typeof info.useMyCaller === "number" ? info.useMyCaller : 0);
-      var caller = info.stack[howManyToSkip];
+      if (typeof info.useMyCaller === 'number') {
+        info.stack = info.stack.slice(info.useMyCaller);
+      }
+      var caller = info.stack[0];
       info.func = caller.func;
       info.file = caller.file;
       info.line = caller.line;
@@ -542,11 +547,10 @@ var forkJoin = function (options, iterable, fn) {
         }
       });
 
-      _.each(iterable, function (/*arguments*/) {
+      _.each(iterable, function (...args) {
         var fut = new Future();
-        var fnArguments = arguments;
         Fiber(function () {
-          runOne(fut, fnArguments);
+          runOne(fut, args);
         }).run();
         futures.push(fut);
       });
@@ -567,10 +571,9 @@ var forkJoin = function (options, iterable, fn) {
       });
     } else {
       // not parallel
-      _.each(iterable, function (/*arguments*/) {
-        var fnArguments = arguments;
+      _.each(iterable, function (...args) {
         try {
-          var result = fn.apply(null, fnArguments);
+          var result = fn(...args);
           results.push(result);
           errors.push(null);
         } catch (e) {
@@ -609,5 +612,6 @@ _.extend(exports, {
   reportProgress: reportProgress,
   reportProgressDone: reportProgressDone,
   getCurrentProgressTracker: getCurrentProgressTracker,
-  addChildTracker: addChildTracker
+  addChildTracker: addChildTracker,
+  _MessageSet: MessageSet
 });

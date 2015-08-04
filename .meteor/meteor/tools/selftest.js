@@ -1,23 +1,26 @@
 var _ = require('underscore');
+var util = require('util');
+var Future = require('fibers/future');
+var child_process = require('child_process');
+var phantomjs = require('phantomjs');
+var webdriver = require('browserstack-webdriver');
+
 var files = require('./files.js');
 var utils = require('./utils.js');
 var parseStack = require('./parse-stack.js');
-var release = require('./release.js');
-var catalog = require('./catalog.js');
+var Console = require('./console.js').Console;
 var archinfo = require('./archinfo.js');
-var Future = require('fibers/future');
-var isopackets = require("./isopackets.js");
 var config = require('./config.js');
 var buildmessage = require('./buildmessage.js');
-var util = require('util');
-var child_process = require('child_process');
-var webdriver = require('browserstack-webdriver');
-var phantomjs = require('phantomjs');
-var catalogRemote = require('./catalog-remote.js');
-var Console = require('./console.js').Console;
-var tropohouseModule = require('./tropohouse.js');
-var packageMapModule = require('./package-map.js');
-var isopackCacheModule = require('./isopack-cache.js');
+
+var catalog = require('./catalog/catalog.js');
+var catalogRemote = require('./catalog/catalog-remote.js');
+var isopackCacheModule = require('./isobuild/isopack-cache.js');
+var isopackets = require('./tool-env/isopackets.js');
+
+var tropohouseModule = require('./packaging/tropohouse.js');
+var packageMapModule = require('./packaging/package-map.js');
+var release = require('./packaging/release.js');
 
 // Exception representing a test failure
 var TestFailure = function (reason, details) {
@@ -111,7 +114,8 @@ var ROOT_PACKAGES_TO_BUILD_IN_SANDBOX = [
   // We need the tool in order to run from the fake warehouse at all.
   "meteor-tool",
   // We need the packages in the skeleton app in order to test 'meteor create'.
-  "meteor-platform", "autopublish", "insecure"
+  "meteor-platform", "autopublish", "insecure", "standard-minifiers",
+  "es5-shim"
 ];
 
 var setUpBuiltPackageTropohouse = function () {
@@ -162,7 +166,7 @@ var newSelfTestCatalog = function () {
   if (! files.inCheckout())
     throw Error("Only can build packages from a checkout");
 
-  var catalogLocal = require('./catalog-local.js');
+  var catalogLocal = require('./catalog/catalog-local.js');
   var selfTestCatalog = new catalogLocal.LocalCatalog;
   var messages = buildmessage.capture(
     { title: "scanning local core packages" },
@@ -222,10 +226,12 @@ _.extend(Matcher.prototype, {
     var timer = null;
     if (timeout) {
       timer = setTimeout(function () {
+        var pattern = self.matchPattern;
         self.matchPattern = null;
         self.matchStrict = null;
         self.matchFuture = null;
-        f['throw'](new TestFailure('match-timeout', { run: self.run }));
+        f['throw'](new TestFailure('match-timeout', { run: self.run,
+                                                      pattern: pattern }));
       }, timeout * 1000);
     }
 
@@ -461,7 +467,7 @@ var Sandbox = function (options) {
   self.warehouse = null;
 
   self.home = files.pathJoin(self.root, 'home');
-  files.mkdir(self.home, 0755);
+  files.mkdir(self.home, 0o755);
   self.cwd = self.home;
   self.env = {};
   self.fakeMongo = options.fakeMongo;
@@ -537,12 +543,12 @@ var Sandbox = function (options) {
 
 _.extend(Sandbox.prototype, {
   // Create a new test run of the tool in this sandbox.
-  run: function (/* arguments */) {
+  run: function (...args) {
     var self = this;
 
     return new Run(self.execPath, {
       sandbox: self,
-      args: _.toArray(arguments),
+      args: args,
       cwd: self.cwd,
       env: self._makeEnv(),
       fakeMongo: self.fakeMongo
@@ -557,9 +563,9 @@ _.extend(Sandbox.prototype, {
   //   run.connectClient();
   //   // post-connection checks
   // });
-  testWithAllClients: function (f) {
+  testWithAllClients: function (f, ...args) {
     var self = this;
-    var argsArray = _.compact(_.toArray(arguments).slice(1));
+    args = _.compact(args);
 
     console.log("running test with " + self.clients.length + " client(s).");
 
@@ -567,7 +573,7 @@ _.extend(Sandbox.prototype, {
       console.log("testing with " + client.name + "...");
       var run = new Run(self.execPath, {
         sandbox: self,
-        args: argsArray,
+        args: args,
         cwd: self.cwd,
         env: self._makeEnv(),
         fakeMongo: self.fakeMongo,
@@ -690,6 +696,12 @@ _.extend(Sandbox.prototype, {
   write: function (filename, contents) {
     var self = this;
     files.writeFile(files.pathJoin(self.cwd, filename), contents, 'utf8');
+  },
+
+  // Like writeFile, but appends rather than writes.
+  append: function (filename, contents) {
+    var self = this;
+    files.appendFile(files.pathJoin(self.cwd, filename), contents, 'utf8');
   },
 
   // Reads a file in the sandbox as a utf8 string. 'filename' is a
@@ -1016,7 +1028,7 @@ _.extend(BrowserStackClient.prototype, {
     var self = this;
     var browserStackPath =
       files.pathJoin(files.getDevBundle(), 'bin', 'BrowserStackLocal');
-    files.chmod(browserStackPath, 0755);
+    files.chmod(browserStackPath, 0o755);
 
     var args = [
       browserStackPath,
@@ -1100,13 +1112,13 @@ _.extend(Run.prototype, {
   // Pass as many arguments as you want. Non-object values will be
   // cast to string, and object values will be treated as maps from
   // option names to values.
-  args: function (/* arguments */) {
+  args: function (...args) {
     var self = this;
 
     if (self.proc)
       throw new Error("already started?");
 
-    _.each(_.toArray(arguments), function (a) {
+    _.each(args, function (a) {
       if (typeof a !== "object") {
         self._args.push('' + a);
       } else {
@@ -1788,7 +1800,8 @@ var runTests = function (options) {
                                          frames[0].file);
         Console.rawError("  => " + failure.reason + " at " +
                          relpath + ":" + frames[0].line + "\n");
-        if (failure.reason === 'no-match' || failure.reason === 'junk-before') {
+        if (failure.reason === 'no-match' || failure.reason === 'junk-before' ||
+            failure.reason === 'match-timeout') {
           Console.arrowError("Pattern: " + failure.details.pattern, 2);
         }
         if (failure.reason === "wrong-exit-code") {

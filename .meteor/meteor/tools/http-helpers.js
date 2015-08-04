@@ -11,7 +11,7 @@ var Future = require('fibers/future');
 var files = require('./files.js');
 var auth = require('./auth.js');
 var config = require('./config.js');
-var release = require('./release.js');
+var release = require('./packaging/release.js');
 var Console = require('./console.js').Console;
 
 
@@ -51,11 +51,11 @@ _.extend(WritableWithProgress.prototype, {
   },
 
   once: function () {
-    return this._inner.once.apply(this._inner, arguments);
+    return this._inner.once(...arguments);
   },
 
   emit: function () {
-    return this._inner.emit.apply(this._inner, arguments);
+    return this._inner.emit(...arguments);
   }
 });
 
