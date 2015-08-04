@@ -54,8 +54,7 @@ var typeNameTranslation = {
   "Blaze.View": typeLink("Blaze.View", "#blaze_view"),
   Template: typeLink("Blaze.Template", "#blaze_template"),
   DOMElement: typeLink("DOM Element", "https://developer.mozilla.org/en-US/docs/Web/API/element"),
-  MatchPattern: typeLink("Match Pattern", "#matchpatterns"),
-  "DDP.Connection": typeLink("DDP Connection", "#ddp_connect")
+  MatchPattern: typeLink("Match Pattern", "#matchpatterns")
 };
 
 Template.autoApiBox.helpers({

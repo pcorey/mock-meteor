@@ -1,22 +1,22 @@
 Package.describe({
   summary: "Tiny testing framework",
-  version: '1.0.6-plugins.0'
+  version: '1.0.5'
 });
 
 Package.onUse(function (api) {
-  api.use([
-    'ejson',
-    'underscore',
-    'random',
-    'ddp',
-    'mongo',
-    'check'
-  ]);
+  api.use('underscore', ['client', 'server']);
+  api.use('random', ['client', 'server']);
 
-  api.addFiles('tinytest.js');
-  api.addFiles('model.js');
+  api.export('Tinytest');
+
+  api.addFiles('tinytest.js', ['client', 'server']);
+
+  api.use('ddp', ['client', 'server']);
+  api.use('mongo', ['client', 'server']);
+  api.addFiles('model.js', ['client', 'server']);
+
   api.addFiles('tinytest_client.js', 'client');
   api.addFiles('tinytest_server.js', 'server');
 
-  api.export('Tinytest');
+  api.use('check');
 });

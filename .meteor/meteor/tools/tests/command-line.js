@@ -1,11 +1,11 @@
 var selftest = require('../selftest.js');
 var Sandbox = selftest.Sandbox;
 var archinfo = require('../archinfo.js');
-var release = require('../packaging/release.js');
+var release = require('../release.js');
 var _ = require('underscore');
 var files = require('../files.js');
 var utils = require('../utils.js');
-var runMongo = require('../runners/run-mongo.js');
+var runMongo = require('../run-mongo.js');
 
 selftest.define("argument parsing", function () {
   var s = new Sandbox;

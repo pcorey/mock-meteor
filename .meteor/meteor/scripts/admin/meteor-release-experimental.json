@@ -1,7 +1,7 @@
 {
- "track": "PLUGINS-PREVIEW",
- "version": "2",
- "recommended": false,
- "official": false,
- "description": "Preview release for new plugin APIs"
+    "track": "METEOR",
+    "version": "1.1.0.3-rc.0",
+    "recommended": false,
+    "official": false,
+    "description": "Release candidate of patch release for 1.1"
 }

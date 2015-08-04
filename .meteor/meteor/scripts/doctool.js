@@ -26,7 +26,7 @@
 ///  *
 /// For lines that don't, no big deal.
 ///
-///     Leading whitespace will be preserved here.
+///     Leading whitspace will be preserved here.
 ///
 ///  * We can create a bullet list in here:
 ///  *

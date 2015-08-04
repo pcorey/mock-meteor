@@ -1,14 +1,13 @@
 var Future = require('fibers/future');
 var _ = require('underscore');
-var semver = require('semver');
-var os = require('os');
-var url = require('url');
-
 var fiberHelpers = require('./fiber-helpers.js');
 var archinfo = require('./archinfo.js');
 var buildmessage = require('./buildmessage.js');
 var files = require('./files.js');
-var packageVersionParser = require('./packaging/package-version-parser.js');
+var packageVersionParser = require('./package-version-parser.js');
+var semver = require('semver');
+var os = require('os');
+var url = require('url');
 
 var utils = exports;
 
@@ -219,42 +218,33 @@ exports.validatePackageName = function (name, options) {
   }
 };
 
-// Parse a string of the form `package + " " + version` into an object
-// of the form {package, version}.  For backwards compatibility,
-// an "@" separator instead of a space is also accepted.
-//
-// Lines of `.meteor/versions` are parsed using this function, among
-// other uses.
-exports.parsePackageAndVersion = function (packageAtVersionString, options) {
-  var error = null;
-  var separatorPos = Math.max(packageAtVersionString.lastIndexOf(' '),
-                              packageAtVersionString.lastIndexOf('@'));
-  if (separatorPos < 0) {
-    error = new Error("Malformed package version: " +
-                      JSON.stringify(packageAtVersionString));
-  } else {
-    var packageName = packageAtVersionString.slice(0, separatorPos);
-    var version = packageAtVersionString.slice(separatorPos+1);
-    try {
-      packageVersionParser.validatePackageName(packageName);
-      // validate the version, ignoring the parsed result:
-      packageVersionParser.parse(version);
-    } catch (e) {
-      if (! e.versionParserError) {
-        throw e;
-      }
-      error = e;
-    }
-    if (! error) {
-      return { package: packageName, version: version };
+// Parse a string of the form package@version into an object of the form
+// {name, version}.
+exports.parsePackageAtVersion = function (packageAtVersionString, options) {
+  // A string that has to look like "package@version" isn't really a
+  // constraint, it's just a string of the form (package + "@" + version).
+  // However, using parsePackageConstraint in the implementation is too
+  // convenient to pass up (especially in terms of error-handling quality).
+  var parsedConstraint = exports.parsePackageConstraint(packageAtVersionString,
+                                                        options);
+  if (! parsedConstraint) {
+    // It must be that options.useBuildmessage and an error has been
+    // registered.  Otherwise, parsePackageConstraint would succeed or throw.
+    return null;
+  }
+  var alternatives = parsedConstraint.versionConstraint.alternatives;
+  if (! (alternatives.length === 1 &&
+         alternatives[0].type === 'compatible-with')) {
+    if (options && options.useBuildmessage) {
+      buildmessage.error("Malformed package@version: " + packageAtVersionString,
+                         { file: options.buildmessageFile });
+      return null;
+    } else {
+      throw new Error("Malformed package@version: " + packageAtVersionString);
     }
   }
-  // `error` holds an Error
-  if (! (options && options.useBuildmessage)) {
-    throw error;
-  }
-  buildmessage.error(error.message, { file: options.buildmessageFile });
-  return null;
+  return { package: parsedConstraint.package,
+           version: alternatives[0].versionString };
 };
 
 // Check for invalid package names. Currently package names can only contain
@@ -293,7 +283,7 @@ exports.validatePackageNameOrExit = function (packageName, options) {
     Console.error(e.message, Console.options({ bulletPoint: "Error: " }));
     // lazy-load main: old bundler tests fail if you add a circular require to
     // this file
-    var main = require('./cli/main.js');
+    var main = require('./main.js');
     throw new main.ExitWithCode(1);
   }
 };
@@ -385,6 +375,46 @@ exports.isDirectory = function (dir) {
   return stats.isDirectory();
 };
 
+// XXX from Underscore.String (http://epeli.github.com/underscore.string/)
+exports.startsWith = function(str, starts) {
+  return str.length >= starts.length &&
+    str.substring(0, starts.length) === starts;
+};
+
+// Options: noPrefix: do not display 'Meteor ' in front of the version number.
+exports.displayRelease = function (track, version, options) {
+  var catalog = require('./catalog.js');
+  options = options || {};
+  var prefix = options.noPrefix ? "" : "Meteor ";
+
+  if (catalog.DEFAULT_TRACK !== "WINDOWS-PREVIEW") {
+    // XXX HACK for windows. In the bottom of catalog-remote.js, we make the
+    // default track for windows be "WINDOWS-PREVIEW", but we want `meteor
+    // --version` to actually show "WINDOWS-PREVIEW@x.y.z" instead of just
+    // "x.y.z".
+    if (track === catalog.DEFAULT_TRACK) {
+      return prefix + version;
+    }
+  }
+  return track + '@' + version;
+};
+
+exports.splitReleaseName = function (releaseName) {
+  var parts = releaseName.split('@');
+  var track, version;
+  if (parts.length === 1) {
+    var catalog = require('./catalog.js');
+    track = catalog.DEFAULT_TRACK;
+    version = parts[0];
+  } else {
+    track = parts[0];
+    // Do we forbid '@' sign in release versions? I sure hope so, but let's
+    // be careful.
+    version = parts.slice(1).join("@");
+  }
+  return [track, version];
+};
+
 // Calls cb with each subset of the array "total", with non-decreasing size,
 // until all subsets have been used or cb returns true. The array passed
 // to cb may be safely mutated or retained by cb.
@@ -432,18 +462,10 @@ exports.generateSubsetsOfIncreasingSize = function (total, cb) {
   }
 };
 
-exports.isUrlWithFileScheme = function (x) {
-  return /^file:\/\/.+/.test(x);
-};
-
 exports.isUrlWithSha = function (x) {
   // For now, just support http/https, which is at least less restrictive than
   // the old "github only" rule.
   return /^https?:\/\/.*[0-9a-f]{40}/.test(x);
-};
-
-exports.isPathRelative = function (x) {
-  return x.charAt(0) !== '/';
 };
 
 // If there is a version that isn't exact, throws an Error with a
@@ -465,8 +487,7 @@ exports.ensureOnlyExactVersions = function (dependencies) {
   });
 };
 exports.isExactVersion = function (version) {
-  return semver.valid(version) || exports.isUrlWithSha(version)
-    || exports.isUrlWithFileScheme(version);
+  return semver.valid(version) || exports.isUrlWithSha(version);
 };
 
 
@@ -475,11 +496,6 @@ exports.execFileSync = function (file, args, opts) {
 
   var child_process = require('child_process');
   var eachline = require('eachline');
-
-  opts = opts || {};
-  if (! _.has(opts, 'maxBuffer')) {
-    opts.maxBuffer = 1024 * 1024 * 10;
-  }
 
   if (opts && opts.pipeOutput) {
     var p = child_process.spawn(file, args, opts);
@@ -679,6 +695,17 @@ exports.longformDate = function (date) {
 // example).
 exports.maxDateLength = "September 24th, 2014".length;
 
+// If we have failed to update the catalog, informs the user and advises them to
+// go online for up to date inforation.
+exports.explainIfRefreshFailed = function () {
+  var Console = require("./console.js").Console;
+  var catalog = require('./catalog.js');
+  if (catalog.official.offline || catalog.refreshFailed) {
+    Console.info("Your package catalog may be out of date.\n" +
+      "Please connect to the internet and try again.");
+  }
+};
+
 // Returns a sha256 hash of a given string.
 exports.sha256 = function (contents) {
   var crypto = require('crypto');
@@ -686,14 +713,3 @@ exports.sha256 = function (contents) {
   hash.update(contents);
   return hash.digest('base64');
 };
-
-exports.sourceMapLength = function (sm) {
-  if (! sm) return 0;
-  // sum the length of sources and the mappings, the size of
-  // metadata is ignored, but it is not a big deal
-  return sm.mappings.length
-       + (sm.sourcesContent || []).reduce((soFar, current) => {
-         return soFar + (current ? current.length : 0);
-       }, 0);
-};
-

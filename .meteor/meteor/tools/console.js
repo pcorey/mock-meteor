@@ -63,7 +63,7 @@ var util = require('util');
 var buildmessage = require('./buildmessage.js');
 // XXX: Are we happy with chalk (and its sub-dependencies)?
 var chalk = require('chalk');
-var cleanup = require('./tool-env/cleanup.js');
+var cleanup = require('./cleanup.js');
 var utils = require('./utils.js');
 var wordwrap = require('wordwrap');
 
@@ -733,13 +733,13 @@ _.extend(Console.prototype, {
 
   // Don't pretty-fy this output by trying to, for example, line-wrap it. Just
   // print it to the screen as it is.
-  rawDebug: function(...args) {
+  rawDebug: function(/*arguments*/) {
     var self = this;
     if (! self.isDebugEnabled()) {
       return;
     }
 
-    var message = self._format(args);
+    var message = self._format(arguments);
     self._print(LEVEL_DEBUG, message);
   },
 
@@ -752,11 +752,11 @@ _.extend(Console.prototype, {
   //   - indent: offset the entire string by a specific number of
   //     characters. See _wrap for more details.
   //
-  debug: function(...args) {
+  debug: function(/*arguments*/) {
     var self = this;
     if (! self.isDebugEnabled()) { return; }
 
-    var message = self._prettifyMessage(args);
+    var message = self._prettifyMessage(arguments);
     self._print(LEVEL_DEBUG, message);
   },
 
@@ -766,24 +766,24 @@ _.extend(Console.prototype, {
 
   // Don't pretty-fy this output by trying to, for example, line-wrap it. Just
   // print it to the screen as it is.
-  rawInfo: function(...args) {
+  rawInfo: function(/*arguments*/) {
     var self = this;
     if (! self.isInfoEnabled()) {
       return;
     }
 
-    var message = self._format(args);
+    var message = self._format(arguments);
     self._print(LEVEL_INFO, message);
   },
 
   // Generally, we want to process the output for legibility, for example, by
   // wrapping it. For raw output (ex: stack traces, user logs, etc), use the
   // rawInfo function. For more information about options, see: debug.
-  info: function(...args) {
+  info: function(/*arguments*/) {
     var self = this;
     if (! self.isInfoEnabled()) { return; }
 
-    var message = self._prettifyMessage(args);
+    var message = self._prettifyMessage(arguments);
     self._print(LEVEL_INFO, message);
   },
 
@@ -791,41 +791,41 @@ _.extend(Console.prototype, {
     return this.isLevelEnabled(LEVEL_CODE_WARN);
   },
 
-  rawWarn: function(...args) {
+  rawWarn: function(/*arguments*/) {
     var self = this;
     if (! self.isWarnEnabled()) {
       return;
     }
 
-    var message = self._format(args);
+    var message = self._format(arguments);
     self._print(LEVEL_WARN, message);
   },
 
   // Generally, we want to process the output for legibility, for example, by
   // wrapping it. For raw output (ex: stack traces, user logs, etc), use the
   // rawWarn function. For more information about options, see: debug.
-  warn: function(...args) {
+  warn: function(/* arguments */) {
     var self = this;
     if (! self.isWarnEnabled()) { return; }
 
-    var message = self._prettifyMessage(args);
+    var message = self._prettifyMessage(arguments);
     self._print(LEVEL_WARN, message);
   },
 
-  rawError: function(...args) {
+  rawError: function(/*arguments*/) {
     var self = this;
 
-    var message = self._format(args);
+    var message = self._format(arguments);
     self._print(LEVEL_ERROR, message);
   },
 
   // Generally, we want to process the output for legibility, for example, by
   // wrapping it. For raw output (ex: stack traces, user logs, etc), use the
   // rawError function. For more information about options, see: debug.
-  error: function(...args) {
+  error: function(/*arguments*/) {
     var self = this;
 
-    var message = self._prettifyMessage(args);
+    var message = self._prettifyMessage(arguments);
     self._print(LEVEL_ERROR, message);
   },
 

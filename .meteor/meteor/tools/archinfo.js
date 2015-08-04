@@ -128,10 +128,11 @@ var os = require('os');
 var _host = null; // memoize
 var host = function () {
   if (! _host) {
-    var run = function (...args) {
-      var result = files.run.apply(null, args);
+    var run = function (/* arguments */) {
+      var result = files.run.apply(null, arguments);
       if (! result)
-        throw new Error("can't get arch with " + args.join(" ") + "?");
+        throw new Error("can't get arch with " +
+                        _.toArray(arguments).join(" ") + "?");
       return result.replace(/\s*$/, ''); // trailing whitespace
     };
 

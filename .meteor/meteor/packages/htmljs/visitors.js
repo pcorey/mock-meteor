@@ -82,7 +82,7 @@ HTML.Visitor.def({
   visitObject: function (obj/*, ...*/) {
     throw new Error("Unexpected object in htmljs: " + obj);
   },
-  visitFunction: function (fn/*, ...*/) {
+  visitFunction: function (obj/*, ...*/) {
     throw new Error("Unexpected function in htmljs: " + obj);
   }
 });

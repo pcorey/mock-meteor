@@ -40,8 +40,7 @@ var toc = [
         {instance: "this", name: "stop", id: "publish_stop"},
         {instance: "this", name: "connection", id: "publish_connection"}
       ],
-      "Meteor.subscribe",
-      {name: "DDPRateLimiter", id: "ddpratelimiter"}
+      "Meteor.subscribe"
     ],
 
     {name: "Methods", id: "methods_header"}, [
@@ -54,8 +53,7 @@ var toc = [
       ],
       "Meteor.Error",
       "Meteor.call",
-      "Meteor.apply",
-      {name: "DDPRateLimiter", id: "ddpratelimiter"}
+      "Meteor.apply"
     ],
 
     {name: "Check", id: "check_package"}, [
@@ -81,11 +79,7 @@ var toc = [
         {instance: "collection", name: "upsert"},
         {instance: "collection", name: "remove"},
         {instance: "collection", name: "allow"},
-        {instance: "collection", name: "deny"},
-        {instance: "collection", name: "rawCollection",
-         id: "Mongo-Collection-rawCollection"},
-        {instance: "collection", name: "rawDatabase",
-         id: "Mongo-Collection-rawDatabase"}
+        {instance: "collection", name: "deny"}
       ],
 
       "Mongo.Cursor", [
@@ -227,7 +221,6 @@ var toc = [
         {instance: "computation", name: "stop", id: "computation_stop"},
         {instance: "computation", name: "invalidate", id: "computation_invalidate"},
         {instance: "computation", name: "onInvalidate", id: "computation_oninvalidate"},
-        {instance: "computation", name: "onStop", id: "computation_onstop"},
         {instance: "computation", name: "stopped", id: "computation_stopped"},
         {instance: "computation", name: "invalidated", id: "computation_invalidated"},
         {instance: "computation", name: "firstRun", id: "computation_firstrun"}
@@ -344,7 +337,6 @@ var toc = [
     "meteor mongo",
     "meteor reset",
     "meteor build",
-    "meteor lint",
     "meteor search",
     "meteor show",
     "meteor publish",

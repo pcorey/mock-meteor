@@ -1,9 +1,6 @@
-import files from "./files.js";
-import _ from "underscore";
-import pathwatcher from "./safe-pathwatcher.js";
-import {createHash} from "crypto";
-import {coalesce} from "./func-utils.js";
-import {Profile} from "./tool-env/profile.js";
+var files = require('./files.js');
+var _ = require('underscore');
+var pathwatcher = require("./safe-pathwatcher.js");
 
 // Watch for changes to a set of files, and the first time that any of
 // the files change, call a user-provided callback. (If you want a
@@ -23,8 +20,7 @@ import {Profile} from "./tool-env/profile.js";
 //
 // In a directory watch, you provide an absolute path to a directory,
 // two lists of regular expressions specifying the entries to
-// include and exclude, a list of specific names to include (which ignores
-// the exclude regexp list) and an array of which entries to expect.
+// include and exclude, and an array of which entries to expect.
 //
 // For directory watches, the regular expressions work as follows. You provide
 // two arrays of regular expressions, an include list and an exclude list. An
@@ -34,11 +30,7 @@ import {Profile} from "./tool-env/profile.js";
 // '/' if the entry is directory. There is NO IMPLICIT RECURSION here: a
 // directory watch ONLY watches the immediate children of the directory! If you
 // want a recursive watch, you need to do the recursive walk while building the
-// WatchSet and add a bunch of separate directory watches.  In addition, you
-// can provide a list of specific names to expect; these are not filtered
-// by the exclude list.  (For example, you might want to see all "*.js" files
-// but ignore files starting with dots (which are often temporary files), but
-// explicitly ask for ".jshintrc".)
+// WatchSet and add a bunch of separate directory watches.
 //
 // There can be multiple directory watches on the same directory. There is no
 // relationship between the files found in directory watches and the files
@@ -61,85 +53,85 @@ import {Profile} from "./tool-env/profile.js";
 // nonexistent if they point to something nonexist, etc). Not sure if this is
 // correct.
 
-export class WatchSet {
-  constructor() {
-    var self = this;
+var WatchSet = function () {
+  var self = this;
 
-    // Set this to true if any Watcher built on this WatchSet must immediately
-    // fire (eg, if this WatchSet was given two different sha1 for the same file).
-    self.alwaysFire = false;
+  // Set this to true if any Watcher built on this WatchSet must immediately
+  // fire (eg, if this WatchSet was given two different sha1 for the same file).
+  self.alwaysFire = false;
 
-    // Map from the absolute path to a file, to a sha1 hash, or null if the file
-    // should not exist. A Watcher created from this set fires when the file
-    // changes from that sha, or is deleted (if non-null) or created (if null).
-    //
-    // Note that Isopack.getSourceFilesUnderSourceRoot() depends on this field
-    // existing (it's not just an internal implementation detail of watch.js).
-    self.files = {};
+  // Map from the absolute path to a file, to a sha1 hash, or null if the file
+  // should not exist. A Watcher created from this set fires when the file
+  // changes from that sha, or is deleted (if non-null) or created (if null).
+  //
+  // Note that Isopack.getSourceFilesUnderSourceRoot() depends on this field
+  // existing (it's not just an internal implementation detail of watch.js).
+  self.files = {};
 
-    // Array of object with keys:
-    // - 'absPath': absolute path to a directory
-    // - 'include': array of RegExps
-    // - 'exclude': array of RegExps
-    // - 'names': array of strings
-    // - 'contents': array of strings, or null if the directory should not exist
-    //
-    // This represents the assertion that 'absPath' is a directory and that
-    // 'contents' is its immediate contents, as filtered by the regular
-    // expressions.  Entries in 'contents' are file and subdirectory names;
-    // directory names end with '/'. 'contents' is sorted. An entry is in
-    // 'contents' if its value (including the slash, for directories) matches at
-    // least one regular expression in 'include' and no regular expressions in
-    // 'exclude'... or if it is in 'names'.
-    //
-    // There is no recursion here: files contained in subdirectories never appear.
-    //
-    // A directory may have multiple entries (presumably with different
-    // include/exclude filters).
-    self.directories = [];
-  }
+  // Array of object with keys:
+  // - 'absPath': absolute path to a directory
+  // - 'include': array of RegExps
+  // - 'exclude': array of RegExps
+  // - 'contents': array of strings, or null if the directory should not exist
+  //
+  // This represents the assertion that 'absPath' is a directory and that
+  // 'contents' is its immediate contents, as filtered by the regular
+  // expressions.  Entries in 'contents' are file and subdirectory names;
+  // directory names end with '/'. 'contents' is sorted. An entry is in
+  // 'contents' if its value (including the slash, for directories) matches at
+  // least one regular expression in 'include' and no regular expressions in
+  // 'exclude'.
+  //
+  // There is no recursion here: files contained in subdirectories never appear.
+  //
+  // A directory may have multiple entries (presumably with different
+  // include/exclude filters).
+  self.directories = [];
+};
 
-  addFile(filePath, hash) {
+_.extend(WatchSet.prototype, {
+  addFile: function (filePath, hash) {
     var self = this;
     // No need to update if this is in always-fire mode already.
-    if (self.alwaysFire) {
+    if (self.alwaysFire)
       return;
-    }
     if (_.has(self.files, filePath)) {
       // Redundant?
-      if (self.files[filePath] === hash) {
+      if (self.files[filePath] === hash)
         return;
-      }
       // Nope, inconsistent.
       self.alwaysFire = true;
       return;
     }
     self.files[filePath] = hash;
-  }
+  },
 
-  addDirectory({absPath, include, exclude, names, contents: unsortedContents}) {
+  // Takes options absPath, include, exclude, and contents, as described
+  // above. contents does not need to be pre-sorted.
+  addDirectory: function (options) {
     var self = this;
-    if (self.alwaysFire) {
+    if (self.alwaysFire)
       return;
-    }
-    if (_.isEmpty(include) && _.isEmpty(names)) {
+    if (_.isEmpty(options.include))
       return;
-    }
-    const contents = _.clone(unsortedContents);
-    if (contents) {
+    var contents = _.clone(options.contents);
+    if (contents)
       contents.sort();
-    }
 
-    self.directories.push({absPath, include, exclude, names, contents});
-  }
+    self.directories.push({
+      absPath: options.absPath,
+      include: options.include,
+      exclude: options.exclude,
+      contents: contents
+    });
+  },
 
   // Merges another WatchSet into this one. This one will now fire if either
   // WatchSet would have fired.
-  merge(other) {
+  merge: function (other) {
     var self = this;
-    if (self.alwaysFire) {
+    if (self.alwaysFire)
       return;
-    }
     if (other.alwaysFire) {
       self.alwaysFire = true;
       return;
@@ -152,9 +144,9 @@ export class WatchSet {
       // are never mutated #WatchSetShallowClone
       self.directories.push(dir);
     });
-  }
+  },
 
-  clone() {
+  clone: function () {
     var self = this;
     var ret = new WatchSet();
 
@@ -164,29 +156,24 @@ export class WatchSet {
     ret.files = _.clone(self.files);
     ret.directories = _.clone(self.directories);
     return ret;
-  }
+  },
 
-  toJSON() {
+  toJSON: function () {
     var self = this;
-    if (self.alwaysFire) {
+    if (self.alwaysFire)
       return {alwaysFire: true};
-    }
     var ret = {files: self.files};
 
     var reToJSON = function (r) {
       var options = '';
-      if (r.ignoreCase) {
+      if (r.ignoreCase)
         options += 'i';
-      }
-      if (r.multiline) {
+      if (r.multiline)
         options += 'm';
-      }
-      if (r.global) {
+      if (r.global)
         options += 'g';
-      }
-      if (options) {
+      if (options)
         return {$regex: r.source, $options: options};
-      }
       return r.source;
     };
 
@@ -195,79 +182,72 @@ export class WatchSet {
         absPath: d.absPath,
         include: _.map(d.include, reToJSON),
         exclude: _.map(d.exclude, reToJSON),
-        names: d.names,
         contents: d.contents
       };
     });
 
     return ret;
   }
+});
 
-  static fromJSON(json) {
-    var set = new WatchSet();
+WatchSet.fromJSON = function (json) {
+  var set = new WatchSet();
 
-    if (! json) {
-      return set;
-    }
+  if (! json)
+    return set;
 
-    if (json.alwaysFire) {
-      set.alwaysFire = true;
-      return set;
-    }
-
-    set.files = _.clone(json.files);
-
-    var reFromJSON = function (j) {
-      if (_.has(j, '$regex')) {
-        return new RegExp(j.$regex, j.$options);
-      }
-      return new RegExp(j);
-    };
-
-    set.directories = _.map(json.directories, function (d) {
-      return {
-        absPath: d.absPath,
-        include: _.map(d.include, reFromJSON),
-        exclude: _.map(d.exclude, reFromJSON),
-        names: d.names,
-        contents: d.contents
-      };
-    });
-
+  if (json.alwaysFire) {
+    set.alwaysFire = true;
     return set;
   }
-}
+
+  set.files = _.clone(json.files);
+
+  var reFromJSON = function (j) {
+    if (_.has(j, '$regex'))
+      return new RegExp(j.$regex, j.$options);
+    return new RegExp(j);
+  };
+
+  set.directories = _.map(json.directories, function (d) {
+    return {
+      absPath: d.absPath,
+      include: _.map(d.include, reFromJSON),
+      exclude: _.map(d.exclude, reFromJSON),
+      contents: d.contents
+    };
+  });
+
+  return set;
+};
 
 var readFile = function (absPath) {
   try {
     return files.readFile(absPath);
   } catch (e) {
     // Rethrow most errors.
-    if (! e || (e.code !== 'ENOENT' && e.code !== 'EISDIR')) {
+    if (! e || (e.code !== 'ENOENT' && e.code !== 'EISDIR'))
       throw e;
-    }
     // File does not exist (or is a directory).
     return null;
   }
 };
 
-export function sha1(contents) {
-  return Profile("sha1", function () {
-    var hash = createHash('sha1');
-    hash.update(contents);
-    return hash.digest('hex');
-  })();
-}
+var sha1 = function (contents) {
+  var crypto = require('crypto');
+  var hash = crypto.createHash('sha1');
+  hash.update(contents);
+  return hash.digest('hex');
+};
 
-export function readDirectory({absPath, include, exclude, names}) {
+var readDirectory = function (options) {
   // Read the directory.
   try {
-    var contents = files.readdir(absPath);
+    var contents = files.readdir(options.absPath);
   } catch (e) {
     // If the path is not a directory, return null; let other errors through.
-    if (e && (e.code === 'ENOENT' || e.code === 'ENOTDIR')) {
+    if (e && (e.code === 'ENOENT' || e.code === 'ENOTDIR'))
       return null;
-    }
     throw e;
   }
 
@@ -278,7 +258,7 @@ export function readDirectory({absPath, include, exclude, names}) {
       // We do stat instead of lstat here, so that we treat symlinks to
       // directories just like directories themselves.
       // XXX Does the treatment of symlinks make sense?
-      var stats = files.stat(files.pathJoin(absPath, entry));
+      var stats = files.stat(files.pathJoin(options.absPath, entry));
     } catch (e) {
       if (e && (e.code === 'ENOENT')) {
         // Disappeared after the readdir (or a dangling symlink)? Eh,
@@ -287,96 +267,82 @@ export function readDirectory({absPath, include, exclude, names}) {
       }
       throw e;
     }
-    if (stats.isDirectory()) {
+    if (stats.isDirectory())
       entry += '/';
-    }
     contentsWithSlashes.push(entry);
   });
 
   // Filter based on regexps.
-  var filtered = contentsWithSlashes.filter((entry) => {
-    // Is it one of the names we explicitly requested?
-    if (names && names.indexOf(entry) !== -1) {
-      return true;
-    }
-    // Is it ruled out by an exclude rule?
-    if (exclude && exclude.some(re => re.test(entry))) {
-      return false;
-    }
-    // Is it ruled in by an include rule?
-    if (include && include.some(re => re.test(entry))) {
-      return true;
-    }
-    return false;
+  var filtered = _.filter(contentsWithSlashes, function (entry) {
+    return _.any(options.include, function (re) {
+      return re.test(entry);
+    }) && ! _.any(options.exclude, function (re) {
+      return re.test(entry);
+    });
   });
 
   // Sort it!
   filtered.sort();
   return filtered;
-}
+};
 
 // All fields are private.
-export class Watcher {
-  constructor(options) {
-    var self = this;
+var Watcher = function (options) {
+  var self = this;
 
-    // The set to watch.
-    self.watchSet = options.watchSet;
-    if (! self.watchSet) {
-      throw new Error("watchSet option is required");
-    }
+  // The set to watch.
+  self.watchSet = options.watchSet;
+  if (! self.watchSet)
+    throw new Error("watchSet option is required");
 
-    // Function to call when a change is detected according to one of
-    // the above.
-    self.onChange = options.onChange;
-    if (! self.onChange) {
-      throw new Error("onChange option is required");
-    }
+  // Function to call when a change is detected according to one of
+  // the above.
+  self.onChange = options.onChange;
+  if (! self.onChange)
+    throw new Error("onChange option is required");
 
-    self.stopped = false;
-    self.justCheckOnce = !! options._justCheckOnce;
+  self.stopped = false;
+  self.justCheckOnce = !! options._justCheckOnce;
 
-    self.watches = {
-      // <absolute path of watched file or directory>: {
-      //   // Null until pathwatcher.watch succeeds in watching the file.
-      //   watcher: <object returned by pathwatcher.watch> | null,
-      //   // Undefined until we stat the file for the first time, then null
-      //   // if the file is observed to be missing.
-      //   lastStat: <object returned by files.stat> | null | undefined
-      // }
-    };
+  self.watches = {
+    // <absolute path of watched file or directory>: {
+    //   // Null until pathwatcher.watch succeeds in watching the file.
+    //   watcher: <object returned by pathwatcher.watch> | null,
+    //   // Undefined until we stat the file for the first time, then null
+    //   // if the file is observed to be missing.
+    //   lastStat: <object returned by files.stat> | null | undefined
+    // }
+  };
 
-    // Were we given an inconsistent WatchSet? Fire now and be done with it.
-    if (self.watchSet.alwaysFire) {
-      self._fire();
-      return;
-    }
-
-    self._startFileWatches();
-    self._checkDirectories();
+  // Were we given an inconsistent WatchSet? Fire now and be done with it.
+  if (self.watchSet.alwaysFire) {
+    self._fire();
+    return;
   }
 
-  _fireIfFileChanged(absPath) {
+  self._startFileWatches();
+  self._checkDirectories();
+};
+
+_.extend(Watcher.prototype, {
+  _fireIfFileChanged: function (absPath) {
     var self = this;
 
-    if (self.stopped) {
+    if (self.stopped)
       return true;
-    }
 
     var oldHash = self.watchSet.files[absPath];
 
-    if (oldHash === undefined) {
+    if (oldHash === undefined)
       throw new Error("Checking unknown file " + absPath);
-    }
 
     var contents = readFile(absPath);
 
     if (contents === null) {
       // File does not exist (or is a directory).
       // Is this what we expected?
-      if (oldHash === null) {
+      if (oldHash === null)
         return false;
-      }
       // Nope, not what we expected.
       self._fire();
       return true;
@@ -391,26 +357,23 @@ export class Watcher {
     var newHash = sha1(contents);
 
     // Unchanged?
-    if (newHash === oldHash) {
+    if (newHash === oldHash)
       return false;
-    }
 
     self._fire();
     return true;
-  }
+  },
 
-  _fireIfDirectoryChanged(info) {
+  _fireIfDirectoryChanged: function (info) {
     var self = this;
 
-    if (self.stopped) {
+    if (self.stopped)
       return true;
-    }
 
     var newContents = readDirectory({
       absPath: info.absPath,
       include: info.include,
-      exclude: info.exclude,
-      names: info.names
+      exclude: info.exclude
     });
 
     // If the directory has changed (including being deleted or created).
@@ -420,28 +383,26 @@ export class Watcher {
     }
 
     return false;
-  }
+  },
 
-  _startFileWatches() {
+  _startFileWatches: function () {
     var self = this;
 
     // Set up a watch for each file
     _.each(self.watchSet.files, function (hash, absPath) {
-      if (self.stopped) {
+      if (self.stopped)
         return;
-      }
 
-      if (! self.justCheckOnce) {
+      if (! self.justCheckOnce)
         self._watchFileOrDirectory(absPath);
-      }
 
       // Check for the case where by the time we created the watch,
       // the file had already changed from the sha we were provided.
       self._fireIfFileChanged(absPath);
     });
-  }
+  },
 
-  _watchFileOrDirectory(absPath) {
+  _watchFileOrDirectory: function (absPath) {
     var self = this;
 
     if (! _.has(self.watches, absPath)) {
@@ -485,9 +446,9 @@ export class Watcher {
 
       self._watchFileOrDirectory(parentDir);
     }
-  }
+  },
 
-  _makeWatchEventCallback(absPath) {
+  _makeWatchEventCallback: function (absPath) {
     var self = this;
 
     // Sometimes we receive a rapid succession of change events, perhaps
@@ -499,7 +460,7 @@ export class Watcher {
     // canceling any additional calls if they happen within that window of
     // time, so that a rapid succession of calls will tend to trigger only
     // one inspection of the file system.
-    return coalesce(100, function onWatchEvent() {
+    return require('./func-utils.js').coalesce(100, function onWatchEvent() {
       if (self.stopped) {
         return;
       }
@@ -559,33 +520,23 @@ export class Watcher {
         });
       }
     });
-  }
+  },
 
-  // XXX Erk! This is wrong!  A null entry in a WatchSet means "is not a file",
-  // not "does not exist"; if you look at readAndWatchFileWithHash, "a directory
-  // where a file was expected" leads to the entry being null.  Right now this
-  // leads to infinite watcher refresh loops if something that needs to be a
-  // directory ends up as a file.  This all needs to be changed so that null
-  // means "not a file" again. A simple way to reproduce is to run
-  //    $ meteor --settings /tmp
-  // See #3854.
-  _mustNotExist(absPath) {
+  _mustNotExist: function(absPath) {
     var wsFiles = this.watchSet.files;
-    if (_.has(wsFiles, absPath)) {
+    if (_.has(wsFiles, absPath))
       return wsFiles[absPath] === null;
-    }
     return false;
-  }
+  },
 
-  _mustBeAFile(absPath) {
+  _mustBeAFile: function(absPath) {
     var wsFiles = this.watchSet.files;
-    if (_.has(wsFiles, absPath)) {
+    if (_.has(wsFiles, absPath))
       return _.isString(wsFiles[absPath]);
-    }
     return false;
-  }
+  },
 
-  _updateStatForWatch(absPath) {
+  _updateStatForWatch: function(absPath) {
     var self = this;
     var entry = self.watches[absPath];
     var lastStat = entry.lastStat;
@@ -647,42 +598,38 @@ export class Watcher {
     }
 
     return stat;
-  }
+  },
 
-  _checkDirectories() {
+  _checkDirectories: function () {
     var self = this;
 
-    if (self.stopped) {
+    if (self.stopped)
       return;
-    }
 
     _.each(self.watchSet.directories, function (info) {
-      if (self.stopped) {
+      if (self.stopped)
         return;
-      }
 
-      if (! self.justCheckOnce) {
+      if (! self.justCheckOnce)
         self._watchFileOrDirectory(info.absPath);
-      }
 
       // Check for the case where by the time we created the watch, the
       // directory has already changed.
       self._fireIfDirectoryChanged(info);
     });
-  }
+  },
 
-  _fire() {
+  _fire: function () {
     var self = this;
 
-    if (self.stopped) {
+    if (self.stopped)
       return;
-    }
 
     self.stop();
     self.onChange();
-  }
+  },
 
-  stop() {
+  stop: function () {
     var self = this;
     self.stopped = true;
 
@@ -695,11 +642,11 @@ export class Watcher {
     });
     self.watches = {};
   }
-}
+});
 
 // Given a WatchSet, returns true if it currently describes the state of the
 // disk.
-export function isUpToDate(watchSet) {
+var isUpToDate = function (watchSet) {
   var upToDate = true;
   var watcher = new Watcher({
     watchSet: watchSet,
@@ -712,14 +659,14 @@ export function isUpToDate(watchSet) {
   });
   watcher.stop();
   return upToDate;
-}
+};
 
-// Options should have absPath/include/exclude/names.
-export function readAndWatchDirectory(watchSet, options) {
+// Options should have absPath/include/exclude.
+var readAndWatchDirectory = function (watchSet, options) {
   var contents = readDirectory(options);
   watchSet.addDirectory(_.extend({contents: contents}, options));
   return contents;
-}
+};
 
 // Calculating the sha hash can be expensive for large files.  By
 // returning the calculated hash along with the file contents, the
@@ -728,7 +675,7 @@ export function readAndWatchDirectory(watchSet, options) {
 // We only calculate the hash if needed here, so callers must not
 // *rely* on the hash being returned; merely that if the hash is
 // present, it is the correct hash of the contents.
-export function readAndWatchFileWithHash(watchSet, absPath) {
+var readAndWatchFileWithHash = function (watchSet, absPath) {
   var contents = readFile(absPath);
   var hash = null;
   // Allow null watchSet, if we want to use readFile-style error handling in a
@@ -739,8 +686,19 @@ export function readAndWatchFileWithHash(watchSet, absPath) {
     watchSet.addFile(absPath, hash);
   }
   return {contents: contents, hash: hash};
-}
+};
 
-export function readAndWatchFile(watchSet, absPath) {
+var readAndWatchFile = function (watchSet, absPath) {
   return readAndWatchFileWithHash(watchSet, absPath).contents;
-}
+};
+
+_.extend(exports, {
+  WatchSet: WatchSet,
+  Watcher: Watcher,
+  readDirectory: readDirectory,
+  isUpToDate: isUpToDate,
+  readAndWatchDirectory: readAndWatchDirectory,
+  readAndWatchFile: readAndWatchFile,
+  readAndWatchFileWithHash: readAndWatchFileWithHash,
+  sha1: sha1
+});

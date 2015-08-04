@@ -13,11 +13,7 @@ CS.PackagesResolver = function (catalog, options) {
 
   self._options = {
     nudge: options && options.nudge,
-    Profile: options && options.Profile,
-    // For resultCache, pass in an empty object `{}`, and PackagesResolver
-    // will put data on it.  Pass in the same object again to allow reusing
-    // the result from the previous run.
-    resultCache: options && options.resultCache
+    Profile: options && options.Profile
   };
 };
 
@@ -62,34 +58,21 @@ CS.PackagesResolver.prototype.resolve = function (dependencies, constraints,
       input.loadFromCatalog(self.catalogLoader);
     });
 
-  var resultCache = self._options.resultCache;
-  if (resultCache && resultCache.lastInput &&
-      input.isEqual(resultCache.lastInput)) {
-    return resultCache.lastOutput;
-  }
-
   if (options.previousSolution && options.missingPreviousVersionIsError) {
     Profile.time("check for previous versions in catalog", function () {
-      _.each(options.previousSolution, function (version, pkg) {
-        if (! input.catalogCache.hasPackageVersion(pkg, version)) {
+      _.each(options.previousSolution, function (version, package) {
+        if (! input.catalogCache.hasPackageVersion(package, version)) {
           CS.throwConstraintSolverError(
-            "Package version not in catalog: " + pkg + " " + version);
+            "Package version not in catalog: " + package + " " + version);
         }
       });
     });
   }
 
-  var output = CS.PackagesResolver._resolveWithInput(input, {
+  return CS.PackagesResolver._resolveWithInput(input, {
     nudge: self._options.nudge,
     Profile: self._options.Profile
   });
-
-  if (resultCache) {
-    resultCache.lastInput = input;
-    resultCache.lastOutput = output;
-  }
-
-  return output;
 };
 
 // Exposed for tests.
@@ -116,8 +99,8 @@ CS.PackagesResolver._resolveWithInput = function (input, options) {
     });
   });
 
-  // Disable runtime type checks (they slow things down a bunch)
-  return Logic.disablingAssertions(function () {
+  // Disable runtime type checks (they slow things down by a factor of 3)
+  return Logic._disablingTypeChecks(function () {
     var result = solver.getAnswer({
       allAnswers: options.allAnswers
     });
@@ -132,7 +115,7 @@ CS.PackagesResolver._resolveWithInput = function (input, options) {
 // - vConstraint: a PackageVersion.VersionConstraint, or an object
 //   with an `alternatives` property lifted from one.
 // - version: version String
-CS.isConstraintSatisfied = function (pkg, vConstraint, version) {
+CS.isConstraintSatisfied = function (package, vConstraint, version) {
   return _.some(vConstraint.alternatives, function (simpleConstraint) {
     var type = simpleConstraint.type;
 

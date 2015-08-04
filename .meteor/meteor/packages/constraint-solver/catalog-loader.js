@@ -34,7 +34,7 @@ CS.CatalogLoader = function (fromCatalog, toCatalogCache) {
 //   references: [{arch: String, optional "weak": true}] }`.
 
 var convertDeps = function (catalogDeps) {
-  return _.map(catalogDeps, function (dep, pkg) {
+  return _.map(catalogDeps, function (dep, package) {
     // The dependency is strong if any of its "references"
     // (for different architectures) are strong.
     var isStrong = _.any(dep.references, function (ref) {
@@ -43,31 +43,31 @@ var convertDeps = function (catalogDeps) {
 
     var constraint = (dep.constraint || null);
 
-    return new CS.Dependency(new PV.PackageConstraint(pkg, constraint),
+    return new CS.Dependency(new PV.PackageConstraint(package, constraint),
                              isStrong ? null : {isWeak: true});
   });
 };
 
 // Since we don't fetch different versions of a package independently
 // at the moment, this helper is where we get our data.
-CS.CatalogLoader.prototype._getSortedVersionRecords = function (pkg) {
-  if (! _.has(this._sortedVersionRecordsCache, pkg)) {
-    this._sortedVersionRecordsCache[pkg] =
-      this.catalog.getSortedVersionRecords(pkg);
+CS.CatalogLoader.prototype._getSortedVersionRecords = function (package) {
+  if (! _.has(this._sortedVersionRecordsCache, package)) {
+    this._sortedVersionRecordsCache[package] =
+      this.catalog.getSortedVersionRecords(package);
   }
 
-  return this._sortedVersionRecordsCache[pkg];
+  return this._sortedVersionRecordsCache[package];
 };
 
-CS.CatalogLoader.prototype.loadAllVersions = function (pkg) {
+CS.CatalogLoader.prototype.loadAllVersions = function (package) {
   var self = this;
   var cache = self.catalogCache;
-  var versionRecs = self._getSortedVersionRecords(pkg);
+  var versionRecs = self._getSortedVersionRecords(package);
   _.each(versionRecs, function (rec) {
     var version = rec.version;
-    if (! cache.hasPackageVersion(pkg, version)) {
+    if (! cache.hasPackageVersion(package, version)) {
       var deps = convertDeps(rec.dependencies);
-      cache.addPackageVersion(pkg, version, deps);
+      cache.addPackageVersion(package, version, deps);
     }
   });
 };
@@ -84,20 +84,20 @@ CS.CatalogLoader.prototype.loadAllVersionsRecursive = function (packageList) {
   var loadQueue = [];
   var packagesEverEnqueued = {};
 
-  var enqueue = function (pkg) {
-    if (! _.has(packagesEverEnqueued, pkg)) {
-      packagesEverEnqueued[pkg] = true;
-      loadQueue.push(pkg);
+  var enqueue = function (package) {
+    if (! _.has(packagesEverEnqueued, package)) {
+      packagesEverEnqueued[package] = true;
+      loadQueue.push(package);
     }
   };
 
   _.each(packageList, enqueue);
 
   while (loadQueue.length) {
-    var pkg = loadQueue.pop();
-    self.loadAllVersions(pkg);
-    _.each(self.catalogCache.getPackageVersions(pkg), function (v) {
-      var depMap = self.catalogCache.getDependencyMap(pkg, v);
+    var package = loadQueue.pop();
+    self.loadAllVersions(package);
+    _.each(self.catalogCache.getPackageVersions(package), function (v) {
+      var depMap = self.catalogCache.getDependencyMap(package, v);
       _.each(depMap, function (dep, package2) {
         enqueue(package2);
       });

@@ -1,20 +1,12 @@
 if (Meteor.isClient) {
   var sessionVar = Session.get("sessionVar");
 
-  var maybeCall = function () {
-    var A = Package.autoupdate.Autoupdate;
-    if (A._ClientVersions.findOne() && ! A.newClientAvailable()) {
-      Meteor.call("clientLoad",
-                  typeof jsVar === 'undefined' ? 'undefined' : jsVar,
-                  typeof packageVar === 'undefined' ? 'undefined' : packageVar,
-                  sessionVar);
-    } else {
-      setTimeout(maybeCall, 100);
-    }
-  };
-  // Wait a little to "ensure" that "client modified" messages (etc) appear
-  // before our messages
-  setTimeout(maybeCall, 300);
+  Meteor.defer(function () {
+    Meteor.call("clientLoad",
+                typeof jsVar === 'undefined' ? 'undefined' : jsVar,
+                typeof packageVar === 'undefined' ? 'undefined' : packageVar,
+                sessionVar);
+  });
 
   Session.setDefault("sessionVar", true);
 }

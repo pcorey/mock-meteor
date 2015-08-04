@@ -15,18 +15,18 @@ var crypto = require('crypto');
 var rimraf = require('rimraf');
 var Future = require('fibers/future');
 var sourcemap = require('source-map');
-var sourceMapRetrieverStack = require('./tool-env/source-map-retriever-stack.js');
+var sourcemap_support = require('source-map-support');
 
 var utils = require('./utils.js');
-var cleanup = require('./tool-env/cleanup.js');
+var cleanup = require('./cleanup.js');
 var buildmessage = require('./buildmessage.js');
 var watch = require('./watch.js');
 var fiberHelpers = require('./fiber-helpers.js');
 var colonConverter = require("./colon-converter.js");
 
-var miniFiles = require('./mini-files.js');
+var miniFiles = require("./server/mini-files.js");
 
-var Profile = require('./tool-env/profile.js').Profile;
+var Profile = require('./profile.js').Profile;
 
 // Attach all exports of miniFiles here to avoid code duplication
 var files = exports;
@@ -34,19 +34,21 @@ _.extend(files, miniFiles);
 
 var parsedSourceMaps = {};
 var nextStackFilenameCounter = 1;
-
-// Use the source maps specified to runJavaScript
-var useParsedSourceMap = function (pathForSourceMap) {
-  // Check our fancy source map data structure, used for isopacks
-  if (_.has(parsedSourceMaps, pathForSourceMap)) {
+var retrieveSourceMap = function (pathForSourceMap) {
+  if (_.has(parsedSourceMaps, pathForSourceMap))
     return {map: parsedSourceMaps[pathForSourceMap]};
-  }
-
   return null;
 };
 
-// Try this source map first
-sourceMapRetrieverStack.push(useParsedSourceMap);
+sourcemap_support.install({
+  // Use the source maps specified to runJavaScript instead of parsing source
+  // code for them.
+  retrieveSourceMap: retrieveSourceMap,
+  // For now, don't fix the source line in uncaught exceptions, because we
+  // haven't fixed handleUncaughtExceptions in source-map-support to properly
+  // locate the source files.
+  handleUncaughtExceptions: false
+});
 
 // given a predicate function and a starting path, traverse upwards
 // from the path until we find a path that satisfies the predicate.
@@ -193,10 +195,6 @@ files.getDevBundle = function () {
   return files.pathJoin(files.getCurrentToolsDir(), 'dev_bundle');
 };
 
-files.getCurrentNodeBinDir = function () {
-  return files.pathJoin(files.getDevBundle(), "bin");
-}
-
 // Return the top-level directory for this meteor install or checkout
 files.getCurrentToolsDir = function () {
   var dirname = files.convertToStandardPath(__dirname);
@@ -290,8 +288,8 @@ var makeTreeReadOnly = function (p) {
     });
   }
   if (stat.isFile()) {
-    var permissions = stat.mode & 0o777;
-    var readOnlyPermissions = permissions & 0o555;
+    var permissions = stat.mode & 0777;
+    var readOnlyPermissions = permissions & 0555;
     if (permissions !== readOnlyPermissions)
       files.chmod(p, readOnlyPermissions);
   }
@@ -358,7 +356,7 @@ files.treeHash = function (root, options) {
       }
       updateHash('file ' + JSON.stringify(relativePath) + ' ' +
                   stat.size + ' ' + files.fileHash(absPath) + '\n');
-      if (stat.mode & 0o100) {
+      if (stat.mode & 0100) {
         updateHash('exec\n');
       }
     } else if (stat.isSymbolicLink()) {
@@ -441,7 +439,7 @@ files.cp_r = function (from, to, options) {
   options = options || {};
 
   var absFrom = files.pathResolve(from);
-  files.mkdir_p(to, 0o755);
+  files.mkdir_p(to, 0755);
 
   _.each(files.readdir(from), function (f) {
     if (_.any(options.ignore || [], function (pattern) {
@@ -467,7 +465,7 @@ files.cp_r = function (from, to, options) {
       // be modified by umask.) We don't copy the mode *directly* because this
       // function is used by 'meteor create' which is copying from the read-only
       // tools tree into a writable app.
-      var mode = (stats.mode & 0o100) ? 0o777 : 0o666;
+      var mode = (stats.mode & 0100) ? 0777 : 0666;
       if (!options.transformContents) {
         copyFileHelper(fullFrom, fullTo, mode);
       } else {
@@ -544,7 +542,7 @@ files.findPathsWithRegex = function (dir, regex, options) {
 // have to exist. Treats symbolic links transparently (copies the contents, not
 // the link itself, and it's an error if the link doesn't point to a file).
 files.copyFile = function (from, to) {
-  files.mkdir_p(files.pathDirname(files.pathResolve(to)), 0o755);
+  files.mkdir_p(files.pathDirname(files.pathResolve(to)), 0755);
 
   var stats = files.stat(from);
   if (!stats.isFile()) {
@@ -556,7 +554,7 @@ files.copyFile = function (from, to) {
   // modified by umask.) We don't copy the mode *directly* because this function
   // is used by 'meteor create' which is copying from the read-only tools tree
   // into a writable app.
-  var mode = (stats.mode & 0o100) ? 0o777 : 0o666;
+  var mode = (stats.mode & 0100) ? 0777 : 0666;
 
   copyFileHelper(from, to, mode);
 };
@@ -607,7 +605,7 @@ files.mkdtemp = function (prefix) {
       var dirPath = files.pathJoin(
         tmpDir, prefix + (Math.random() * 0x100000000 + 1).toString(36));
       try {
-        files.mkdir(dirPath, 0o700);
+        files.mkdir(dirPath, 0700);
         return dirPath;
       } catch (err) {
         tries--;
@@ -642,7 +640,7 @@ files.freeTempDir = function (tempDir) {
       // Don't crash and print a stack trace because we failed to delete a temp
       // directory. This happens sometimes on Windows and seems to be
       // unavoidable.
-      console.log(err);
+      Console.debug(err);
     }
 
     tempDirs = _.without(tempDirs, tempDir);
@@ -658,7 +656,7 @@ if (! process.env.METEOR_SAVE_TMPDIRS) {
         // Don't crash and print a stack trace because we failed to delete a temp
         // directory. This happens sometimes on Windows and seems to be
         // unavoidable.
-        console.log(err);
+        Console.debug(err);
       }
     });
 
@@ -768,7 +766,7 @@ files.createTarGzStream = function (dirPath, options) {
       // setting it in an 'entry' handler is the same strategy that npm
       // does, so we do that here too.
       if (entry.type === "Directory") {
-        entry.mode = (entry.mode || entry.props.mode) | 0o500;
+        entry.mode = (entry.mode || entry.props.mode) | 0500;
         entry.props.mode = entry.mode;
       }
 
@@ -860,9 +858,10 @@ files.symlinkOverSync = function (linkText, file) {
 // with the traditional POSIX execl(2).
 //
 // XXX 'files' is not the ideal place for this but it'll do for now
-files.run = function (command, ...args) {
+files.run = function (command /*, arguments */) {
   var Future = require('fibers/future');
   var future = new Future;
+  var args = _.toArray(arguments).slice(1);
 
   var child_process = require("child_process");
   child_process.execFile(
@@ -876,7 +875,8 @@ files.run = function (command, ...args) {
   return future.wait();
 };
 
-files.runGitInCheckout = function (...args) {
+files.runGitInCheckout = function (/* arguments */) {
+  var args = _.toArray(arguments);
   args.unshift(
     'git', '--git-dir=' +
     files.convertToOSPath(files.pathJoin(files.getCurrentToolsDir(), '.git')));
@@ -986,46 +986,51 @@ files.runJavaScript = function (code, options) {
     // for more information. One thing to try (and in fact, what an
     // early version of this function did) is to actually fork a new
     // node to run the code and parse its output. We instead run an
-    // entirely different JS parser, from the Babel project, but
+    // entirely different JS parser, from the esprima project, but
     // which at least has a nice API for reporting errors.
-    var parse = require('meteor-babel').parse;
+    var esprima = require('esprima');
     try {
-      parse(wrapped, { strictMode: false });
-    } catch (parseError) {
-      if (typeof parseError.loc !== "object") {
-        throw parseError;
+      esprima.parse(wrapped);
+    } catch (esprimaParseError) {
+      // Is this actually an Esprima syntax error?
+      if (!('index' in esprimaParseError &&
+            'lineNumber' in esprimaParseError &&
+            'column' in esprimaParseError &&
+            'description' in esprimaParseError)) {
+        throw esprimaParseError;
       }
-
       var err = new files.FancySyntaxError;
-      err.message = parseError.message;
+
+      err.message = esprimaParseError.description;
 
       if (parsedSourceMap) {
         // XXX this duplicates code in computeGlobalReferences
         var consumer2 = new sourcemap.SourceMapConsumer(parsedSourceMap);
-        var original = consumer2.originalPositionFor(parseError.loc);
+        var original = consumer2.originalPositionFor({
+          line: esprimaParseError.lineNumber,
+          column: esprimaParseError.column - 1
+        });
         if (original.source) {
           err.file = original.source;
           err.line = original.line;
-          err.column = original.column;
+          err.column = original.column + 1;
           throw err;
         }
       }
 
       err.file = filename;  // *not* stackFilename
-      err.line = parseError.loc.line;
-      err.column = parseError.loc.column;
-
+      err.line = esprimaParseError.lineNumber;
+      err.column = esprimaParseError.column;
       // adjust errors on line 1 to account for our header
       if (err.line === 1) {
         err.column -= header.length;
       }
-
       throw err;
     }
 
-    // What? Node thought that this was a parse error and Babel didn't?
-    // Eh, just throw Node's error and don't care too much about the line
-    // numbers being right.
+    // What? Node thought that this was a parse error and esprima didn't? Eh,
+    // just throw Node's error and don't care too much about the line numbers
+    // being right.
     throw nodeParseError;
   }
 
@@ -1171,17 +1176,6 @@ files.getHomeDir = function () {
   }
 };
 
-files.currentEnvWithPathsAdded = function (...paths) {
-  const env = {...process.env};
-
-  const convertedPaths = paths.map(path => files.convertToOSPath(path));
-  let pathDecomposed = (env.PATH || "").split(files.pathOsDelimiter);
-  pathDecomposed.unshift(...convertedPaths);
-
-  env.PATH = pathDecomposed.join(files.pathOsDelimiter);
-  return env;
-}
-
 // add .bat extension to link file if not present
 var ensureBatExtension = function (p) {
   if (p.indexOf(".bat") !== p.length - 4) {
@@ -1303,17 +1297,12 @@ files.readLinkToMeteorScript = function (linkLocation, platform) {
 //   A helpful file to import for this purpose is colon-converter.js, which also
 //   knows how to convert various configuration file formats.
 
-
-files.fsFixPath = {};
 /**
  * Wrap a function from node's fs module to use the right slashes for this OS
  * and run in a fiber, then assign it to the "files" namespace. Each call
  * creates a files.func that runs asynchronously with Fibers (yielding and
  * until the call is done), unless run outside a Fiber or in noYieldsAllowed, in
  * which case it uses fs.funcSync.
- *
- * Also creates a simpler version on files.fsFixPath.* that just fixes the path
- * and fiberizes the Sync version if possible.
  *
  * @param  {String} fsFuncName         The name of the node fs function to wrap
  * @param  {Number[]} pathArgIndices Indices of arguments that have paths, these
@@ -1327,72 +1316,52 @@ files.fsFixPath = {};
 function wrapFsFunc(fsFuncName, pathArgIndices, options) {
   options = options || {};
 
-  const fsFunc = fs[fsFuncName];
-  const fsFuncSync = fs[fsFuncName + "Sync"];
+  var fsFunc = fs[fsFuncName];
+  var fsFuncSync = fs[fsFuncName + "Sync"];
 
-  function makeWrapper ({alwaysSync, sync}) {
-    function wrapper(...args) {
-      for (let j = pathArgIndices.length - 1; j >= 0; --j) {
-        const i = pathArgIndices[j];
-        args[i] = files.convertToOSPath(args[i]);
-      }
-
-      const canYield = Fiber.current && Fiber.yield && ! Fiber.yield.disallowed;
-      const shouldBeSync = alwaysSync || sync;
-
-      if (canYield && shouldBeSync) {
-        const fut = new Future;
-
-        args.push(function callback(err, value) {
-          if (options.noErr) {
-            fut.return(err);
-          } else if (err) {
-            fut.throw(err);
-          } else {
-            fut.return(value);
-          }
-        });
-
-        fsFunc.apply(fs, args);
-
-        const result = fut.wait();
-        return options.modifyReturnValue
-          ? options.modifyReturnValue(result)
-          : result;
-      } else if (shouldBeSync) {
-        // Should be sync but can't yield: we are not in a Fiber.
-        // Run the sync version of the fs.* method.
-        const result = fsFuncSync.apply(fs, args);
-        return options.modifyReturnValue ?
-               options.modifyReturnValue(result) : result;
-      } else if (! sync) {
-        // wrapping a plain async version
-        const cb = args[fsFunc.length - 1];
-        if (typeof cb === 'function') {
-          args[fsFunc.length - 1] = function (err, res) {
-            if (options.modifyReturnValue) {
-              res = options.modifyReturnValue(res);
-            }
-            Fiber(cb.bind(null, err, res)).run();
-          };
-        }
-        fsFunc.apply(fs, args);
-        return null;
-      }
-
-      throw new Error('unexpected');
+  function wrapper() {
+    var argc = arguments.length;
+    var args = new Array(argc);
+    for (var i = 0; i < argc; ++i) {
+      args[i] = arguments[i];
     }
 
-    wrapper.displayName = fsFuncName;
-    return wrapper;
+    for (var j = pathArgIndices.length - 1; j >= 0; --j) {
+      i = pathArgIndices[j];
+      args[i] = files.convertToOSPath(args[i]);
+    }
+
+    if (Fiber.current &&
+        Fiber.yield && ! Fiber.yield.disallowed) {
+      var fut = new Future;
+
+      args.push(function callback(err, value) {
+        if (options.noErr) {
+          fut.return(err);
+        } else if (err) {
+          fut.throw(err);
+        } else {
+          fut.return(value);
+        }
+      });
+
+      fsFunc.apply(fs, args);
+
+      var result = fut.wait();
+      return options.modifyReturnValue
+        ? options.modifyReturnValue(result)
+        : result;
+    }
+
+    // If we're not in a Fiber, run the sync version of the fs.* method.
+    var result = fsFuncSync.apply(fs, args);
+    return options.modifyReturnValue
+      ? options.modifyReturnValue(result)
+      : result;
   }
 
-  files[fsFuncName] = Profile('files.' + fsFuncName, makeWrapper({ alwaysSync: true }));
-
-  files.fsFixPath[fsFuncName] =
-    Profile('wrapped.fs.' + fsFuncName, makeWrapper({ sync: false }));
-  files.fsFixPath[fsFuncName + 'Sync'] =
-    Profile('wrapped.fs.' + fsFuncName + 'Sync', makeWrapper({ sync: true }));
+  wrapper.displayName = fsFuncName;
+  return files[fsFuncName] = Profile("files." + fsFuncName, wrapper);
 }
 
 wrapFsFunc("writeFile", [0]);
@@ -1460,53 +1429,38 @@ wrapFsFunc("symlink", [0, 1]);
 wrapFsFunc("readlink", [0]);
 
 // These don't need to be Fiberized
-files.createReadStream = function (...args) {
+files.createReadStream = function () {
+  var args = _.toArray(arguments);
   args[0] = files.convertToOSPath(args[0]);
-  return fs.createReadStream(...args);
+  return fs.createReadStream.apply(fs, args);
 };
 
-files.createWriteStream = function (...args) {
+files.createWriteStream = function () {
+  var args = _.toArray(arguments);
   args[0] = files.convertToOSPath(args[0]);
-  return fs.createWriteStream(...args);
+  return fs.createWriteStream.apply(fs, args);
 };
 
-files.watchFile = function (...args) {
+files.watchFile = function () {
+  var args = _.toArray(arguments);
   args[0] = files.convertToOSPath(args[0]);
-  return fs.watchFile(...args);
+  return fs.watchFile.apply(fs, args);
 };
 
-files.unwatchFile = function (...args) {
+files.unwatchFile = function () {
+  var args = _.toArray(arguments);
   args[0] = files.convertToOSPath(args[0]);
-  return fs.unwatchFile(...args);
+  return fs.unwatchFile.apply(fs, args);
 };
 
 // wrap pathwatcher because it works with file system paths
 // XXX we don't currently convert the path argument passed to the watch
 //     callback, but we currently don't use the argument either
-files.pathwatcherWatch = function (...args) {
+files.pathwatcherWatch = function () {
+  var args = _.toArray(arguments);
   args[0] = files.convertToOSPath(args[0]);
   // don't import pathwatcher until the moment we actually need it
   // pathwatcher has a record of keeping some global state
   var pathwatcher = require('pathwatcher');
-  return require("pathwatcher").watch(...args);
-};
-
-files.readBufferWithLengthAndOffset = function (filename, length, offset) {
-  var data = new Buffer(length);
-  // Read the data from disk, if it is non-empty. Avoid doing IO for empty
-  // files, because (a) unnecessary and (b) fs.readSync with length 0
-  // throws instead of acting like POSIX read:
-  // https://github.com/joyent/node/issues/5685
-  if (length > 0) {
-    var fd = files.open(filename, "r");
-    try {
-      var count = files.read(
-        fd, data, 0, length, offset);
-    } finally {
-      files.close(fd);
-    }
-    if (count !== length)
-      throw new Error("couldn't read entire resource");
-  }
-  return data;
+  return pathwatcher.watch.apply(pathwatcher, args);
 };

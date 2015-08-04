@@ -8,17 +8,14 @@ Google.whitelistedFields = ['id', 'email', 'verified_email', 'name', 'given_name
 OAuth.registerService('google', 2, null, function(query) {
 
   var response = getTokens(query);
-  var expiresAt = (+new Date) + (1000 * parseInt(response.expiresIn, 10));
   var accessToken = response.accessToken;
   var idToken = response.idToken;
-  var scopes = getScopes(accessToken);
   var identity = getIdentity(accessToken);
 
   var serviceData = {
     accessToken: accessToken,
     idToken: idToken,
-    expiresAt: expiresAt,
-    scope: scopes
+    expiresAt: (+new Date) + (1000 * response.expiresIn)
   };
 
   var fields = _.pick(identity, Google.whitelistedFields);
@@ -83,16 +80,6 @@ var getIdentity = function (accessToken) {
   }
 };
 
-var getScopes = function (accessToken) {
-  try {
-    return HTTP.get(
-      "https://www.googleapis.com/oauth2/v1/tokeninfo",
-      {params: {access_token: accessToken}}).data.scope.split(' ');
-  } catch (err) {
-    throw _.extend(new Error("Failed to fetch tokeninfo from Google. " + err.message),
-                   {response: err.response});
-  }
-};
 
 Google.retrieveCredential = function(credentialToken, credentialSecret) {
   return OAuth.retrieveCredential(credentialToken, credentialSecret);

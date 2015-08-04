@@ -1,6 +1,6 @@
 # templating
 
-Compiles Blaze templates defined in `.html` files. Also automatically includes Blaze on the client.
+Define Blaze templates in `.html` files. Most Meteor apps use this package.
 
 This build plugin parses all of the HTML files in your app and looks for three top-level tags:
 

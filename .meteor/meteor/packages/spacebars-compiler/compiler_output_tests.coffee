@@ -52,19 +52,6 @@ coffee.runCompilerOutputTests = (run) ->
   }
   """
 
-  run "{{foo.bar (baz qux)}}",
-  """
-  function() {
-    var view = this;
-    return Blaze.View("lookup:foo.bar", function() {
-      return Spacebars.mustache(Spacebars.dot(
-               view.lookup("foo"), "bar"),
-               Spacebars.dataMustache(view.lookup("baz"), view.lookup("qux")));
-    });
-  }
-  """
-
-
   run "{{foo bar.baz}}",
   """
   function() {

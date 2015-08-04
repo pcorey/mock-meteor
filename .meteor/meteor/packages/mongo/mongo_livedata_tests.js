@@ -2765,20 +2765,9 @@ Meteor.isServer && Tinytest.add("mongo-livedata - oplog - transform", function (
 });
 
 
-Meteor.isServer && Tinytest.add("mongo-livedata - oplog - drop collection/db", function (test) {
-  // This test uses a random database, so it can be dropped without affecting
-  // anything else.
-  var mongodbUri = Npm.require('mongodb-uri');
-  var parsedUri = mongodbUri.parse(process.env.MONGO_URL);
-  parsedUri.database = 'dropDB' + Random.id();
-  var driver = new MongoInternals.RemoteCollectionDriver(
-    mongodbUri.format(parsedUri), {
-      oplogUrl: process.env.MONGO_OPLOG_URL
-    }
-  );
-
+Meteor.isServer && Tinytest.add("mongo-livedata - oplog - drop collection", function (test) {
   var collName = "dropCollection" + Random.id();
-  var coll = new Mongo.Collection(collName, { _driver: driver });
+  var coll = new Mongo.Collection(collName);
 
   var doc1Id = coll.insert({a: 'foo', c: 1});
   var doc2Id = coll.insert({b: 'bar'});
@@ -2835,16 +2824,7 @@ Meteor.isServer && Tinytest.add("mongo-livedata - oplog - drop collection/db", f
   test.length(output, 1);
   test.equal(output.shift(), ['added', doc4Id, {a: 'foo', c: 3}]);
 
-  // Now drop the database. Should remove all docs again.
-  runInFence(function () {
-    driver.mongo.dropDatabase();
-  });
-
-  test.length(output, 1);
-  test.equal(output.shift(), ['removed', doc4Id]);
-
   handle.stop();
-  driver.mongo.close();
 });
 
 var TestCustomType = function (head, tail) {
@@ -3120,28 +3100,3 @@ Meteor.isServer && Tinytest.add("mongo-livedata - npm modules", function (test) 
   test.isTrue(rawDb);
   test.isTrue(rawDb.admin);
 });
-
-if (Meteor.isServer) {
-  Tinytest.add("mongo-livedata - update/remove don't accept an array as a selector #4804", function (test) {
-    var collection = new Mongo.Collection(Random.id());
-
-    _.times(10, function () {
-      collection.insert({ data: "Hello" });
-    });
-
-    test.equal(collection.find().count(), 10);
-
-    // Test several array-related selectors
-    _.each([[], [1, 2, 3], [{}]], function (selector) {
-      test.throws(function () {
-        collection.remove(selector);
-      });
-
-      test.throws(function () {
-        collection.update(selector, {$set: 5});
-      });
-    });
-    
-    test.equal(collection.find().count(), 10);
-  });
-}

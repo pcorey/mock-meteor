@@ -6,7 +6,6 @@
 
 # Packages from the release:
 meteor-platform
-standard-minifiers
 less
 email
 http

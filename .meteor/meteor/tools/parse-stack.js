@@ -1,4 +1,4 @@
-const _ = require('underscore');
+var _ = require('underscore');
 
 // Given an Error (eg, 'new Error'), return the stack associated with
 // that error as an array. More recently called functions appear first
@@ -14,76 +14,19 @@ const _ = require('underscore');
 // If a function on the stack has been marked with mark(), don't
 // return anything past that function. We call this the "user portion"
 // of the stack.
-export function parse(err) {
-  const frames = err.stack.split('\n');
+exports.parse = function (err) {
+  var frames = err.stack.split('\n');
 
   frames.shift(); // at least the first line is the exception
+  var stop = false;
+  var ret = [];
 
-  // "    - - - - -"
-  // This is something added when you throw an Error through a Future. The
-  // stack above the dashes is the stack of the 'wait' call; the stack below
-  // is the stack inside the fiber where the Error is originally
-  // constructed.
-  // XXX This code assumes that the stack trace can only be split once. It's not
-  // clear whether this can happen multiple times.
-  const indexOfFiberSplit = frames.indexOf('    - - - - -');
-
-  if (indexOfFiberSplit === -1) {
-    // This is a normal stack trace, not a split fiber stack trace
-    return parseStackFrames(frames);
-  }
-
-  // If this is a split stack trace from a future, parse the frames above and
-  // below the split separately.
-  const outsideFiber = parseStackFrames(frames);
-  const insideFiber = parseStackFrames(frames.slice(indexOfFiberSplit + 1));
-
-  // Put the frames below the split at the top of the printed stack trace, since
-  // they are more likely to contain the code that actually threw the error.
-  return insideFiber.concat(outsideFiber);
-}
-
-// Decorator. Mark the point at which a stack trace returned by
-// parse() should stop: no frames earlier than this point will be
-// included in the parsed stack. Confusingly, in the argot of the
-// times, you'd say that frames "higher up" than this or "above" this
-// will not be returned, but you'd also say that those frames are "at
-// the bottom of the stack". Frames below the bottom are the outer
-// context of the framework running the user's code.
-export function markBottom(f) {
-  /* eslint-disable camelcase */
-  return function __bottom_mark__() {
-    return f.apply(this, arguments);
-  };
-  /* eslint-enable camelcase */
-}
-
-// Decorator. Mark the point at which a stack trace returned by
-// parse() should begin: no frames later than this point will be
-// included in the parsed stack. The opposite of markBottom().
-// Frames above the top are helper functions defined by the
-// framework and executed by user code whose internal behavior
-// should not be exposed.
-export function markTop(f) {
-  /* eslint-disable camelcase */
-  return function __top_mark__() {
-    return f.apply(this, arguments);
-  };
-  /* eslint-enable camelcase */
-}
-
-function parseStackFrames(frames) {
-  let stop = false;
-  let ret = [];
-  frames.forEach((frame) => {
-    if (stop) {
+  _.each(frames, function (frame) {
+    if (stop)
       return;
-    }
-
-    let m;
-
-    /* eslint-disable max-len */
-    if (m = frame.match(/^\s*at\s*((new )?.+?)\s*(\[as\s*([^\]]*)\]\s*)?\((.*?)(:(\d+))?(:(\d+))?\)\s*$/)) {
+    var m;
+    if (m =
+        frame.match(/^\s*at\s*((new )?.+?)\s*(\[as\s*([^\]]*)\]\s*)?\((.*?)(:(\d+))?(:(\d+))?\)\s*$/)) {
       // https://code.google.com/p/v8/wiki/JavaScriptStackTraceApi
       // "    at My.Function (/path/to/myfile.js:532:39)"
       // "    at Array.forEach (native)"
@@ -110,34 +53,54 @@ function parseStackFrames(frames) {
         line: m[7] ? +m[7] : undefined,
         column: m[9] ? +m[9] : undefined
       });
-      return;
-    }
-    /* eslint-enable max-len */
-
-    if (m = frame.match(/^\s*at\s+(.+?)(:(\d+))?(:(\d+))?\s*$/)) {
+    } else if (m = frame.match(/^\s*at\s+(.+?)(:(\d+))?(:(\d+))?\s*$/)) {
       // "    at /path/to/myfile.js:532:39"
       ret.push({
         file: m[1],
         line: m[3] ? +m[3] : undefined,
         column: m[5] ? +m[5] : undefined
       });
-      return;
-    }
-
-    if (m = frame.match(/^\s*-\s*-\s*-\s*-\s*-\s*$/)) {
-      // Stop parsing if we reach a stack split from a Future
+    } else if (m = frame.match(/^\s*-\s*-\s*-\s*-\s*-\s*$/)) {
+      // "    - - - - -"
+      // This is something added when you throw an Error through a future. The
+      // stack above the dashes is the stack of the 'wait' call; the stack below
+      // is the stack inside the fiber where the Error is originally
+      // constructed. Taking just the former seems good for now, but in the
+      // future we may want to sew them together (possibly in the opposite
+      // order?)
       stop = true;
-      return;
-    }
-
-    if (_.isEmpty(ret)) {
+    } else if (_.isEmpty(ret)) {
       // We haven't found any stack frames, so probably we have newlines in the
       // error message. Just skip this line.
-      return;
+    } else {
+      throw new Error("Couldn't parse stack frame: '" + frame + "'");
     }
-
-    throw new Error("Couldn't parse stack frame: '" + frame + "'");
   });
 
   return ret;
-}
+};
+
+// Decorator. Mark the point at which a stack trace returned by
+// parse() should stop: no frames earlier than this point will be
+// included in the parsed stack. Confusingly, in the argot of the
+// times, you'd say that frames "higher up" than this or "above" this
+// will not be returned, but you'd also say that those frames are "at
+// the bottom of the stack". Frames below the bottom are the outer
+// context of the framework running the user's code.
+exports.markBottom = function (f) {
+  return function __bottom_mark__ () {
+    return f.apply(this, arguments);
+  };
+};
+
+// Decorator. Mark the point at which a stack trace returned by
+// parse() should begin: no frames later than this point will be
+// included in the parsed stack. The opposite of markBottom().
+// Frames above the top are helper functions defined by the
+// framework and executed by user code whose internal behavior
+// should not be exposed.
+exports.markTop = function (f) {
+  return function __top_mark__ () {
+    return f.apply(this, arguments);
+  };
+};
