@@ -3,7 +3,8 @@ var chai = require("chai"),
     core = require("./base.js"),
     fs = require("fs");
 
-//var babel = require('babel');
+var Fiber = require('fibers');
+var babel = require('babel');
 
 console.log('Loading!');
 
@@ -24,14 +25,20 @@ var cwd = process.cwd();
 var isobuildPath = '../.meteor/meteor/tools/';
 process.chdir(isobuildPath);
 var packageSource = './package-source.js';
-var code = fs.readFileSync(packageSource).toString();
-code = babel.transform(code, {}).code;
-code = code.replace(/require\('(.+)\.js'\)/g, 'require(\''+isobuildPath+'$1.js\')');
-eval(code);
+// var code = fs.readFileSync(packageSource).toString();
+// code = babel.transform(code, {}).code;
+// code = code.replace(/require\('(.+)\.js'\)/g, 'require(\''+isobuildPath+'$1.js\')');
+// eval(code);
+PackageSource = require(isobuildPath+packageSource);
 
 process.chdir(cwd);
 
-// var ps = new PackageSource();
-// ps.initFromPackageDir('../.meteor/meteor/packages/meteor-platform', {});
+var ps = new PackageSource();
+
+new Fiber(function() {
+  ps.initFromPackageDir('../.meteor/meteor/packages/meteor-platform', {});
+}).run();
+
+//console.log('Meteor', Meteor);
 
 console.log('done!');

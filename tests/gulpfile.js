@@ -20,5 +20,5 @@ gulp.task('mocha', function() {
 });
 
 gulp.task('default', function() {
-    gulp.watch(['../**/*.js'], ['mocha']);
+    gulp.watch(['./**/*.js'], ['mocha']);
 });
