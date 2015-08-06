@@ -58,6 +58,7 @@ var STAGE = {
 
 _.extend(ProjectContext.prototype, {
   reset: function (moreOptions, resetOptions) {
+    console.log('reset...');
     var self = this;
     // Allow overriding some options until the next call to reset; used by
     // 'meteor update' code to try various values of releaseForConstraints.
@@ -195,6 +196,7 @@ _.extend(ProjectContext.prototype, {
     self.isopackCache = null;
 
     self._completedStage = STAGE.INITIAL;
+    console.log('INITIAL completed');
   },
 
   readProjectMetadata: function () {
